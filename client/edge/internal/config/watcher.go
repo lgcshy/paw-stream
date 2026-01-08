@@ -19,6 +19,8 @@ type Watcher struct {
 	mu         sync.Mutex
 	lastReload time.Time
 	debounce   time.Duration
+	stopped    bool
+	stopOnce   sync.Once
 }
 
 // NewWatcher creates a new configuration file watcher
@@ -118,6 +120,15 @@ func (w *Watcher) ReloadChan() <-chan bool {
 
 // Stop stops the watcher
 func (w *Watcher) Stop() error {
-	close(w.stopChan)
-	return w.watcher.Close()
+	var err error
+	w.stopOnce.Do(func() {
+		w.mu.Lock()
+		w.stopped = true
+		w.mu.Unlock()
+		
+		close(w.stopChan)
+		err = w.watcher.Close()
+		w.logger.Debug().Msg("Config watcher stopped")
+	})
+	return err
 }
