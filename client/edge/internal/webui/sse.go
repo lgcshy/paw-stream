@@ -50,6 +50,7 @@ func (m *SSEManager) Handler(c *fiber.Ctx) error {
 	c.Set("Cache-Control", "no-cache")
 	c.Set("Connection", "keep-alive")
 	c.Set("X-Accel-Buffering", "no")
+	c.Status(fiber.StatusOK)
 
 	// Generate client ID
 	clientID := fmt.Sprintf("%s-%d", c.IP(), time.Now().UnixNano())
@@ -61,7 +62,7 @@ func (m *SSEManager) Handler(c *fiber.Ctx) error {
 	m.mu.Lock()
 	if m.closed {
 		m.mu.Unlock()
-		return c.Status(fiber.StatusServiceUnavailable).SendString("SSE service is shutting down")
+		return c.SendString("SSE service is shutting down\n")
 	}
 	m.clients[clientID] = msgChan
 	m.mu.Unlock()
@@ -77,8 +78,8 @@ func (m *SSEManager) Handler(c *fiber.Ctx) error {
 		m.logger.Info().Str("client", clientID).Msg("SSE client disconnected")
 	}()
 
-	// Use SetBodyStreamWriter to handle streaming
-	c.Status(fiber.StatusOK).Context().SetBodyStreamWriter(func(w *bufio.Writer) {
+	// This MUST block the handler to keep connection alive
+	c.Context().SetBodyStreamWriter(func(w *bufio.Writer) {
 		// Send initial connection event
 		initialEvent := SSEEvent{
 			Type: "connected",
@@ -89,17 +90,16 @@ func (m *SSEManager) Handler(c *fiber.Ctx) error {
 		}
 		if data, err := json.Marshal(initialEvent); err == nil {
 			w.WriteString(fmt.Sprintf("data: %s\n\n", string(data)))
-			if err := w.Flush(); err != nil {
-				m.logger.Error().Err(err).Str("client", clientID).Msg("Failed to send initial event")
-				return
-			}
+			w.Flush()
 		}
 
 		// Ping ticker
 		ticker := time.NewTicker(15 * time.Second)
 		defer ticker.Stop()
 
-		// Event loop
+		m.logger.Info().Str("client", clientID).Msg("SSE event loop started")
+
+		// Event loop - this MUST run continuously
 		for {
 			select {
 			case msg, ok := <-msgChan:
@@ -125,6 +125,7 @@ func (m *SSEManager) Handler(c *fiber.Ctx) error {
 		}
 	})
 
+	m.logger.Info().Str("client", clientID).Msg("Handler returning")
 	return nil
 }
 
