@@ -40,17 +40,26 @@ func NewClient(apiURL, deviceID, secret string, timeout time.Duration) *Client {
 	}
 }
 
-// GetDeviceInfo fetches device information from API
+// GetDeviceInfo authenticates with API and fetches device information
 func (c *Client) GetDeviceInfo() (*DeviceInfo, error) {
-	url := fmt.Sprintf("%s/api/devices/%s", c.apiURL, c.deviceID)
+	url := fmt.Sprintf("%s/api/device/auth", c.apiURL)
 	
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+	// Create authentication request payload
+	payload := map[string]string{
+		"device_id": c.deviceID,
+		"secret":    c.secret,
+	}
+	
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal payload: %w", err)
+	}
+	
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	// Add device secret as authorization header
-	req.Header.Set("X-Device-Secret", c.secret)
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.httpClient.Do(req)

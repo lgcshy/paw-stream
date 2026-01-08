@@ -22,6 +22,9 @@ func (a *App) setupRoutes() {
 	api.Post("/register", a.authHandler.Register)
 	api.Post("/login", a.authHandler.Login)
 
+	// Device auth endpoint (for edge client, no auth required)
+	api.Post("/device/auth", a.deviceHandler.AuthDevice)
+
 	// Protected routes (require JWT auth)
 	protected := api.Group("", middleware.AuthUser(a.cfg.JWT.Secret))
 

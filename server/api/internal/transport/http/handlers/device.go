@@ -19,6 +19,86 @@ func NewDeviceHandler(deviceService *device.Service) *DeviceHandler {
 	}
 }
 
+// AuthDevice handles POST /api/device/auth - for edge client authentication
+func (h *DeviceHandler) AuthDevice(c *fiber.Ctx) error {
+	ctx := c.Context()
+	
+	// Parse request
+	var req struct {
+		DeviceID string `json:"device_id"`
+		Secret   string `json:"secret"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(ErrorResponse{
+			Error:     "bad_request",
+			Message:   "Invalid request body",
+			RequestID: c.Locals("request_id").(string),
+		})
+	}
+
+	// Validate input
+	if req.DeviceID == "" || req.Secret == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(ErrorResponse{
+			Error:     "validation_error",
+			Message:   "Device ID and secret are required",
+			RequestID: c.Locals("request_id").(string),
+		})
+	}
+
+	// Verify device credentials
+	valid, err := h.deviceService.VerifySecret(ctx, req.DeviceID, req.Secret)
+	if err != nil {
+		if errors.Is(err, errors.ErrDeviceNotFound) {
+			return c.Status(fiber.StatusUnauthorized).JSON(ErrorResponse{
+				Error:     "unauthorized",
+				Message:   "Invalid device credentials",
+				RequestID: c.Locals("request_id").(string),
+			})
+		}
+		if errors.Is(err, errors.ErrDeviceDisabled) {
+			return c.Status(fiber.StatusForbidden).JSON(ErrorResponse{
+				Error:     "forbidden",
+				Message:   "Device is disabled",
+				RequestID: c.Locals("request_id").(string),
+			})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{
+			Error:     "internal_error",
+			Message:   "Failed to authenticate device",
+			RequestID: c.Locals("request_id").(string),
+		})
+	}
+
+	if !valid {
+		return c.Status(fiber.StatusUnauthorized).JSON(ErrorResponse{
+			Error:     "unauthorized",
+			Message:   "Invalid device credentials",
+			RequestID: c.Locals("request_id").(string),
+		})
+	}
+
+	// Get device info
+	dev, err := h.deviceService.GetByID(ctx, req.DeviceID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{
+			Error:     "internal_error",
+			Message:   "Failed to get device info",
+			RequestID: c.Locals("request_id").(string),
+		})
+	}
+
+	// Return device info
+	return c.JSON(fiber.Map{
+		"id":           dev.ID,
+		"name":         dev.Name,
+		"location":     dev.Location,
+		"publish_path": dev.PublishPath,
+		"disabled":     dev.Disabled,
+		"created_at":   dev.CreatedAt,
+		"updated_at":   dev.UpdatedAt,
+	})
+}
+
 // Create handles POST /api/devices
 func (h *DeviceHandler) Create(c *fiber.Ctx) error {
 	// Get user ID from JWT context
