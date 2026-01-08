@@ -69,19 +69,19 @@ func (m *SSEManager) Handler(c *fiber.Ctx) error {
 
 	m.logger.Info().Str("client", clientID).Msg("SSE client connected")
 
-	// Cleanup on disconnect
-	defer func() {
-		m.mu.Lock()
-		delete(m.clients, clientID)
-		close(msgChan)
-		m.mu.Unlock()
-		m.logger.Info().Str("client", clientID).Msg("SSE client disconnected")
-	}()
-
 	// Use fasthttp.StreamWriter to properly handle SSE streaming
 	// This is the KEY to make SSE work correctly in Fiber!
 	c.Status(fiber.StatusOK).Context().SetBodyStreamWriter(fasthttp.StreamWriter(func(w *bufio.Writer) {
 		m.logger.Info().Str("client", clientID).Msg("SSE stream writer started")
+
+		// Cleanup when stream ends
+		defer func() {
+			m.mu.Lock()
+			delete(m.clients, clientID)
+			close(msgChan)
+			m.mu.Unlock()
+			m.logger.Info().Str("client", clientID).Msg("SSE client disconnected")
+		}()
 
 		// Send initial connection event
 		initialEvent := SSEEvent{
@@ -102,6 +102,8 @@ func (m *SSEManager) Handler(c *fiber.Ctx) error {
 		// Ping ticker
 		ticker := time.NewTicker(15 * time.Second)
 		defer ticker.Stop()
+
+		m.logger.Info().Str("client", clientID).Msg("SSE event loop running")
 
 		// Event loop - keeps connection alive
 		for {
