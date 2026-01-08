@@ -7,6 +7,9 @@ PawStream 边缘推流客户端 - 部署在摄像头设备上的轻量级 Go 应
 - ✅ 多种视频输入源支持（V4L2、RTSP、文件、测试画面）
 - ✅ RTSP 推流到 MediaMTX，带设备密钥认证
 - ✅ 与 PawStream API 服务器集成，自动获取推流配置
+- ✅ **Web UI 管理界面**（配置、状态监控、日志查看）
+- ✅ **配置文件热重载**（无需重启即可更新配置）
+- ✅ **实时 SSE 推送**（状态和日志实时更新）
 - ✅ 配置文件和环境变量管理
 - ✅ 结构化日志记录（zerolog）
 - ✅ 优雅启动和关闭
@@ -75,6 +78,15 @@ log:
 health:
   enabled: false
   address: ":9090"
+
+# Web UI（可选）
+webui:
+  enabled: true
+  port: 8088
+  auth:                    # HTTP Basic Auth（可选）
+    enabled: false
+    username: "admin"
+    password: "secret"
 ```
 
 或使用环境变量：
@@ -116,6 +128,37 @@ export PAWSTREAM_INPUT_SOURCE="/dev/video0"
 
 # 调试模式
 ./edge-client start --config config.yaml --log-level debug
+```
+
+### Web UI 管理界面
+
+启动客户端后，访问 Web UI 管理界面：
+
+```
+http://localhost:8088
+```
+
+Web UI 功能：
+
+- **配置标签页**：编辑设备配置、输入源、视频参数等，保存后自动热重载
+- **状态标签页**：实时查看客户端状态、系统资源使用情况
+- **日志标签页**：实时查看应用日志，支持自动滚动
+
+特性：
+
+- ✅ 配置在线编辑，无需重启
+- ✅ 实时状态监控（SSE 推送）
+- ✅ 系统资源监控（CPU、内存、磁盘）
+- ✅ 实时日志查看
+- ✅ 响应式设计，支持移动端访问
+- ✅ 可选的 HTTP Basic Auth 保护
+
+适用场景：
+
+- 边缘设备调试和配置
+- 分布式部署的设备监控
+- 无技术背景用户的简化配置
+- 树莓派等嵌入式设备的本地管理
 ```
 
 ### Systemd 服务

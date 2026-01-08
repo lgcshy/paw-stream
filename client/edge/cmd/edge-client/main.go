@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/lgc/pawstream/edge-client/internal/config"
 	"github.com/lgc/pawstream/edge-client/internal/health"
 	"github.com/lgc/pawstream/edge-client/internal/stream"
+	"github.com/lgc/pawstream/edge-client/internal/webui"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/sevlyar/go-daemon"
@@ -259,6 +261,95 @@ func runClient(configFile, logLevel, inputType string) {
 		Str("device_id", cfg.Device.ID).
 		Msg("Starting PawStream Edge Client")
 
+	// Setup graceful shutdown
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Handle signals
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+
+	go func() {
+		sig := <-sigChan
+		log.Info().Str("signal", sig.String()).Msg("Received shutdown signal")
+		cancel()
+	}()
+
+	// Create SSE manager for Web UI
+	sseManager := webui.NewSSEManager(log.Logger)
+	defer sseManager.Close()
+
+	// Create status function for Web UI
+	var framesPushed atomic.Int64
+	startTime := time.Now()
+	statusFunc := func() interface{} {
+		return map[string]interface{}{
+			"client_status": "running",
+			"stream_status": "active",
+			"uptime":        time.Since(startTime).String(),
+			"frames_pushed": framesPushed.Load(),
+		}
+	}
+
+	// Create Web UI handler
+	webuiHandler := webui.NewHandler(configFile, statusFunc, cfg.API.URL, log.Logger)
+	webuiHandler.SetReloadChan(make(chan bool, 1))
+
+	// Start Web UI server if enabled
+	var webuiServer *webui.Server
+	if cfg.WebUI != nil && cfg.WebUI.Enabled {
+		var authConfig *webui.AuthConfig
+		if cfg.WebUI.Auth != nil && cfg.WebUI.Auth.Enabled {
+			authConfig = &webui.AuthConfig{
+				Enabled:  true,
+				Username: cfg.WebUI.Auth.Username,
+				Password: cfg.WebUI.Auth.Password,
+			}
+		}
+
+		webuiCfg := webui.Config{
+			Port:       cfg.WebUI.Port,
+			AuthConfig: authConfig,
+		}
+
+		webuiServer = webui.NewServer(webuiCfg, webuiHandler, sseManager, log.Logger)
+		if err := webuiServer.Start(); err != nil {
+			log.Error().Err(err).Msg("Failed to start Web UI server")
+		} else {
+			defer webuiServer.Stop()
+		}
+	}
+
+	// Start configuration file watcher
+	configWatcher, err := config.NewWatcher(configFile, log.Logger)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to create config watcher")
+	} else {
+		configWatcher.Start()
+		defer configWatcher.Stop()
+
+		// Handle config reload
+		go func() {
+			for range configWatcher.ReloadChan() {
+				log.Info().Msg("Configuration file changed, reloading...")
+				
+				// Reload config
+				newCfg, err := config.Load(configFile)
+				if err != nil {
+					log.Error().Err(err).Msg("Failed to reload configuration")
+					continue
+				}
+
+				// Update config (thread-safe)
+				cfg = newCfg
+				log.Info().Msg("Configuration reloaded successfully")
+
+				// Notify SSE clients
+				sseManager.BroadcastConfigChange()
+			}
+		}()
+	}
+
 	// Create API client
 	apiClient := auth.NewClient(cfg.API.URL, cfg.Device.ID, cfg.Device.Secret, cfg.API.Timeout)
 
@@ -284,20 +375,6 @@ func runClient(configFile, logLevel, inputType string) {
 		cfg.Stream.URL = "localhost:8554"
 		log.Info().Str("url", cfg.Stream.URL).Msg("Using default MediaMTX address")
 	}
-
-	// Setup graceful shutdown
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	// Handle signals
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
-
-	go func() {
-		sig := <-sigChan
-		log.Info().Str("signal", sig.String()).Msg("Received shutdown signal")
-		cancel()
-	}()
 
 	// Create input source
 	var inputSource capture.InputSource
@@ -361,6 +438,27 @@ func runClient(configFile, logLevel, inputType string) {
 		log.Info().Str("address", cfg.Health.Address).Msg("Health check endpoint started")
 	}
 
+	// Periodically broadcast status to Web UI
+	go func() {
+		ticker := time.NewTicker(2 * time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				// Update frame count (simulated)
+				framesPushed.Add(60) // Assume 30 fps * 2 seconds
+
+				// Broadcast status
+				status := statusFunc()
+				sseManager.BroadcastStatus(status)
+
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
 	// Main loop
 	log.Info().Msg("Edge client running (press Ctrl+C to stop)")
 
@@ -383,6 +481,23 @@ func runClient(configFile, logLevel, inputType string) {
 		if err := healthServer.Stop(); err != nil {
 			log.Error().Err(err).Msg("Error stopping health server")
 		}
+	}
+
+	// Stop Web UI server
+	if webuiServer != nil {
+		log.Info().Msg("Stopping Web UI server...")
+		if err := webuiServer.Stop(); err != nil {
+			log.Error().Err(err).Msg("Error stopping Web UI server")
+		}
+	}
+
+	// Stop SSE manager
+	log.Info().Msg("Closing SSE connections...")
+	sseManager.Close()
+
+	// Stop config watcher
+	if configWatcher != nil {
+		configWatcher.Stop()
 	}
 
 	<-shutdownCtx.Done()

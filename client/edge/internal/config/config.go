@@ -10,15 +10,16 @@ import (
 
 // Config represents the application configuration
 type Config struct {
-	Device   DeviceConfig   `yaml:"device"`
-	API      APIConfig      `yaml:"api"`
-	Input    InputConfig    `yaml:"input"`
-	Video    VideoConfig    `yaml:"video"`
-	Stream   StreamConfig   `yaml:"stream"`
-	Log      LogConfig      `yaml:"log"`
-	Health   HealthConfig   `yaml:"health"`
-	ShutdownTimeout        time.Duration `yaml:"shutdown_timeout"`
-	ValidateInputOnStart   bool          `yaml:"validate_input_on_start"`
+	Device              DeviceConfig  `yaml:"device"`
+	API                 APIConfig     `yaml:"api"`
+	Input               InputConfig   `yaml:"input"`
+	Video               VideoConfig   `yaml:"video"`
+	Stream              StreamConfig  `yaml:"stream"`
+	Log                 LogConfig     `yaml:"log"`
+	Health              HealthConfig  `yaml:"health"`
+	WebUI               *WebUIConfig  `yaml:"webui"`
+	ShutdownTimeout     time.Duration `yaml:"shutdown_timeout"`
+	ValidateInputOnStart bool         `yaml:"validate_input_on_start"`
 }
 
 // DeviceConfig holds device identification
@@ -68,6 +69,20 @@ type HealthConfig struct {
 	Address string `yaml:"address"` // e.g., ":9090"
 }
 
+// WebUIConfig holds Web UI configuration
+type WebUIConfig struct {
+	Enabled bool          `yaml:"enabled"`
+	Port    int           `yaml:"port"`
+	Auth    *WebUIAuthConfig `yaml:"auth"`
+}
+
+// WebUIAuthConfig holds Web UI authentication configuration
+type WebUIAuthConfig struct {
+	Enabled  bool   `yaml:"enabled"`
+	Username string `yaml:"username"`
+	Password string `yaml:"password"`
+}
+
 // Load reads configuration from a YAML file and environment variables
 func Load(filePath string) (*Config, error) {
 	cfg := &Config{
@@ -94,6 +109,11 @@ func Load(filePath string) (*Config, error) {
 		Health: HealthConfig{
 			Enabled: false,
 			Address: ":9090",
+		},
+		WebUI: &WebUIConfig{
+			Enabled: true,
+			Port:    8088,
+			Auth:    nil, // No auth by default
 		},
 		ShutdownTimeout:      10 * time.Second,
 		ValidateInputOnStart: true,

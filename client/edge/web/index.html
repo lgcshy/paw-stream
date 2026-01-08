@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PawStream Edge Client</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🐾 PawStream Edge Client</h1>
+            <div class="status-indicator">
+                <span class="status-dot" id="statusDot"></span>
+                <span id="statusText">连接中...</span>
+            </div>
+        </header>
+
+        <nav class="tabs">
+            <button class="tab-btn active" data-tab="config">⚙️ 配置</button>
+            <button class="tab-btn" data-tab="status">📊 状态</button>
+            <button class="tab-btn" data-tab="logs">📝 日志</button>
+        </nav>
+
+        <main>
+            <!-- 配置标签页 -->
+            <div class="tab-content active" id="config">
+                <div class="card">
+                    <h2>设备配置</h2>
+                    <form id="configForm">
+                        <div class="form-group">
+                            <label for="apiUrl">API 服务器地址</label>
+                            <div class="input-with-button">
+                                <input type="url" id="apiUrl" name="api.url" placeholder="http://localhost:8080" required>
+                                <button type="button" id="validateBtn" class="btn-secondary">验证</button>
+                            </div>
+                            <small class="help-text">MediaMTX API 服务器的 URL</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="deviceId">设备 ID</label>
+                            <input type="text" id="deviceId" name="device.id" placeholder="输入设备 ID" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="deviceSecret">设备密钥</label>
+                            <input type="password" id="deviceSecret" name="device.secret" placeholder="输入设备密钥" required>
+                            <button type="button" class="toggle-password">👁️</button>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="inputType">输入源类型</label>
+                            <select id="inputType" name="input.type" required>
+                                <option value="testsrc">测试图案 (testsrc)</option>
+                                <option value="file">视频文件 (file)</option>
+                                <option value="v4l2">摄像头 (v4l2)</option>
+                                <option value="rtsp">RTSP 流 (rtsp)</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group" id="inputSourceGroup">
+                            <label for="inputSource">输入源</label>
+                            <input type="text" id="inputSource" name="input.source" placeholder="根据类型输入相应的源">
+                            <small class="help-text" id="inputSourceHelp">请选择输入源类型</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="mediamtxUrl">MediaMTX 服务器地址</label>
+                            <input type="url" id="mediamtxUrl" name="mediamtx.url" placeholder="rtsp://localhost:8554" required>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="submit" class="btn-primary">💾 保存配置</button>
+                            <button type="button" id="reloadBtn" class="btn-secondary">🔄 重新加载</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="card">
+                    <h2>Web UI 配置</h2>
+                    <div class="form-group">
+                        <label for="webuiPort">Web UI 端口</label>
+                        <input type="number" id="webuiPort" name="webui.port" min="1" max="65535" value="8088">
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="webuiAuthEnabled" name="webui.auth.enabled">
+                            启用 HTTP Basic Auth
+                        </label>
+                    </div>
+                    <div class="form-group" id="webuiAuthGroup" style="display: none;">
+                        <label for="webuiAuthUser">用户名</label>
+                        <input type="text" id="webuiAuthUser" name="webui.auth.username" placeholder="admin">
+                        <label for="webuiAuthPass">密码</label>
+                        <input type="password" id="webuiAuthPass" name="webui.auth.password" placeholder="设置密码">
+                    </div>
+                </div>
+            </div>
+
+            <!-- 状态标签页 -->
+            <div class="tab-content" id="status">
+                <div class="card">
+                    <h2>运行状态</h2>
+                    <div class="status-grid">
+                        <div class="status-item">
+                            <span class="label">客户端状态</span>
+                            <span class="value" id="clientStatus">-</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="label">流状态</span>
+                            <span class="value" id="streamStatus">-</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="label">运行时长</span>
+                            <span class="value" id="uptime">-</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="label">已推送帧数</span>
+                            <span class="value" id="framesPushed">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>系统信息</h2>
+                    <div class="system-info">
+                        <div class="info-row">
+                            <span class="label">主机名</span>
+                            <span class="value" id="sysHostname">-</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="label">操作系统</span>
+                            <span class="value" id="sysOS">-</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="label">系统运行时长</span>
+                            <span class="value" id="sysUptime">-</span>
+                        </div>
+                    </div>
+
+                    <h3>资源使用</h3>
+                    <div class="resource-item">
+                        <div class="resource-header">
+                            <span>CPU</span>
+                            <span id="cpuUsage">-</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="cpuProgress" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <div class="resource-item">
+                        <div class="resource-header">
+                            <span>内存</span>
+                            <span id="memUsage">-</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="memProgress" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <div class="resource-item">
+                        <div class="resource-header">
+                            <span>磁盘</span>
+                            <span id="diskUsage">-</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="diskProgress" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 日志标签页 -->
+            <div class="tab-content" id="logs">
+                <div class="card">
+                    <div class="card-header">
+                        <h2>实时日志</h2>
+                        <div class="log-controls">
+                            <button id="clearLogsBtn" class="btn-secondary">🗑️ 清空</button>
+                            <label>
+                                <input type="checkbox" id="autoScrollCheck" checked>
+                                自动滚动
+                            </label>
+                        </div>
+                    </div>
+                    <div class="log-container" id="logContainer">
+                        <div class="log-entry">
+                            <span class="log-time">--:--:--</span>
+                            <span class="log-level level-info">INFO</span>
+                            <span class="log-message">等待日志数据...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <p>PawStream Edge Client v1.0.0</p>
+            <p><span id="sseClients">0</span> 个 SSE 连接</p>
+        </footer>
+    </div>
+
+    <script src="sse.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
