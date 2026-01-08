@@ -19,6 +19,7 @@ go.work
 # Config files (except examples)
 config.yaml
 *.local.yaml
+*.backup.*
 
 # Logs
 *.log
@@ -41,3 +42,4 @@ Thumbs.db
 # Build artifacts
 dist/
 build/
+*.fiber.gz

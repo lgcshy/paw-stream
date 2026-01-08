@@ -141,7 +141,7 @@ func (m *SSEManager) Handler(c *fiber.Ctx) error {
 				}
 				
 				// Send event with proper SSE format: event type + data
-				m.logger.Debug().Str("client", clientID).Str("type", string(sseEvent.Type)).Int("size", len(dataBytes)).Msg("Sending SSE event")
+				// m.logger.Debug().Str("client", clientID).Str("type", string(sseEvent.Type)).Int("size", len(dataBytes)).Msg("Sending SSE event")
 				_, err = fmt.Fprintf(w, "event: %s\ndata: %s\n\n", sseEvent.Type, string(dataBytes))
 				if err != nil {
 					m.logger.Warn().Err(err).Str("client", clientID).Msg("Failed to write event")
@@ -151,11 +151,11 @@ func (m *SSEManager) Handler(c *fiber.Ctx) error {
 					m.logger.Warn().Err(err).Str("client", clientID).Msg("Failed to flush event, closing connection")
 					return
 				}
-				m.logger.Debug().Str("client", clientID).Msg("SSE event sent successfully")
+				// m.logger.Debug().Str("client", clientID).Msg("SSE event sent successfully")
 
 			case <-ticker.C:
 				// Send keep-alive comment
-				m.logger.Debug().Str("client", clientID).Msg("Sending keepalive")
+				// m.logger.Debug().Str("client", clientID).Msg("Sending keepalive")
 				fmt.Fprintf(w, ": keepalive\n\n")
 				if err := w.Flush(); err != nil {
 					m.logger.Warn().Err(err).Str("client", clientID).Msg("Failed to send keepalive, closing connection")
