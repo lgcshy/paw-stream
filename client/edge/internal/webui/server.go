@@ -15,6 +15,7 @@ import (
 // Server represents the Web UI HTTP server
 type Server struct {
 	app        *fiber.App
+	host       string
 	port       int
 	authConfig *AuthConfig
 	handler    *Handler
@@ -31,6 +32,7 @@ type AuthConfig struct {
 
 // Config holds Web UI server configuration
 type Config struct {
+	Host       string
 	Port       int
 	AuthConfig *AuthConfig
 }
@@ -66,6 +68,7 @@ func NewServer(cfg Config, handler *Handler, sseManager *SSEManager, logger zero
 
 	s := &Server{
 		app:        app,
+		host:       cfg.Host,
 		port:       cfg.Port,
 		authConfig: cfg.AuthConfig,
 		handler:    handler,
@@ -122,8 +125,9 @@ func (s *Server) setupRoutes() {
 
 // Start starts the Web UI server
 func (s *Server) Start() error {
-	addr := fmt.Sprintf(":%d", s.port)
+	addr := fmt.Sprintf("%s:%d", s.host, s.port)
 	s.logger.Info().
+		Str("host", s.host).
 		Int("port", s.port).
 		Bool("auth", s.authConfig != nil && s.authConfig.Enabled).
 		Msg("Starting Web UI server")
@@ -137,9 +141,19 @@ func (s *Server) Start() error {
 	// Wait a bit for server to start
 	time.Sleep(100 * time.Millisecond)
 
-	s.logger.Info().
-		Str("url", fmt.Sprintf("http://localhost:%d", s.port)).
-		Msg("Web UI available")
+	// Display appropriate URL based on host
+	displayHost := s.host
+	if s.host == "0.0.0.0" || s.host == "" {
+		displayHost = "localhost"
+		s.logger.Info().
+			Str("local_url", fmt.Sprintf("http://localhost:%d", s.port)).
+			Str("network_url", fmt.Sprintf("http://<your-ip>:%d", s.port)).
+			Msg("Web UI available on all interfaces")
+	} else {
+		s.logger.Info().
+			Str("url", fmt.Sprintf("http://%s:%d", displayHost, s.port)).
+			Msg("Web UI available")
+	}
 
 	return nil
 }

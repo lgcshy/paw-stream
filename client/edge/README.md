@@ -82,6 +82,7 @@ health:
 # Web UI（可选）
 webui:
   enabled: true
+  host: "0.0.0.0"          # 监听地址：0.0.0.0 = 所有接口
   port: 8088
   auth:                    # HTTP Basic Auth（可选）
     enabled: false

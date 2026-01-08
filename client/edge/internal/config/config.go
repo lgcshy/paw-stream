@@ -71,8 +71,9 @@ type HealthConfig struct {
 
 // WebUIConfig holds Web UI configuration
 type WebUIConfig struct {
-	Enabled bool          `yaml:"enabled"`
-	Port    int           `yaml:"port"`
+	Enabled bool             `yaml:"enabled"`
+	Host    string           `yaml:"host"`
+	Port    int              `yaml:"port"`
 	Auth    *WebUIAuthConfig `yaml:"auth"`
 }
 
@@ -112,6 +113,7 @@ func Load(filePath string) (*Config, error) {
 		},
 		WebUI: &WebUIConfig{
 			Enabled: true,
+			Host:    "0.0.0.0", // Listen on all interfaces
 			Port:    8088,
 			Auth:    nil, // No auth by default
 		},

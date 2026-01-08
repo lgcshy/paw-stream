@@ -308,6 +308,7 @@ func runClient(configFile, logLevel, inputType string) {
 		}
 
 		webuiCfg := webui.Config{
+			Host:       cfg.WebUI.Host,
 			Port:       cfg.WebUI.Port,
 			AuthConfig: authConfig,
 		}
