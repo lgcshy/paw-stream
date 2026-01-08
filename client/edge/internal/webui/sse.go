@@ -113,9 +113,23 @@ func (m *SSEManager) Handler(c *fiber.Ctx) error {
 					m.logger.Info().Str("client", clientID).Msg("Message channel closed")
 					return
 				}
-				// Send event
-				m.logger.Debug().Str("client", clientID).Int("size", len(msg)).Msg("Sending SSE event")
-				_, err := fmt.Fprintf(w, "data: %s\n\n", string(msg))
+				// Parse the event to get type
+				var sseEvent SSEEvent
+				if err := json.Unmarshal(msg, &sseEvent); err != nil {
+					m.logger.Error().Err(err).Str("client", clientID).Msg("Failed to unmarshal SSE event")
+					continue
+				}
+				
+				// Marshal just the data part
+				dataBytes, err := json.Marshal(sseEvent.Data)
+				if err != nil {
+					m.logger.Error().Err(err).Str("client", clientID).Msg("Failed to marshal event data")
+					continue
+				}
+				
+				// Send event with proper SSE format: event type + data
+				m.logger.Debug().Str("client", clientID).Str("type", string(sseEvent.Type)).Int("size", len(dataBytes)).Msg("Sending SSE event")
+				_, err = fmt.Fprintf(w, "event: %s\ndata: %s\n\n", sseEvent.Type, string(dataBytes))
 				if err != nil {
 					m.logger.Warn().Err(err).Str("client", clientID).Msg("Failed to write event")
 					return

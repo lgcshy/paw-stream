@@ -39,11 +39,52 @@ class SSEClient {
         this.eventSource.onmessage = (event) => {
             try {
                 const data = JSON.parse(event.data);
-                this.handleEvent(data);
+                // For events without explicit type, treat as generic message
+                this.handleEvent({
+                    type: event.type || 'message',
+                    data: data
+                });
             } catch (err) {
                 console.error('[SSE] Failed to parse event:', err, event.data);
             }
         };
+
+        // Listen for specific event types
+        this.eventSource.addEventListener('connected', (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                console.log('[SSE] Server acknowledged connection:', data);
+            } catch (err) {
+                console.error('[SSE] Failed to parse connected event:', err);
+            }
+        });
+
+        this.eventSource.addEventListener('status', (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                this.trigger('status', data);
+            } catch (err) {
+                console.error('[SSE] Failed to parse status event:', err);
+            }
+        });
+
+        this.eventSource.addEventListener('log', (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                this.trigger('log', data);
+            } catch (err) {
+                console.error('[SSE] Failed to parse log event:', err);
+            }
+        });
+
+        this.eventSource.addEventListener('config', (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                this.trigger('config', data);
+            } catch (err) {
+                console.error('[SSE] Failed to parse config event:', err);
+            }
+        });
 
         this.eventSource.onerror = (error) => {
             console.error('[SSE] Error:', error);
