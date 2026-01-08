@@ -1,77 +1,79 @@
 # Edge Client 零配置启动 - 任务清单
 
-## Phase 1: 基础支持 ⏳
+## Phase 1: 基础支持 ✅
 
-### 1.1 配置文件自动查找
+**状态**: 已完成并提交 (commit: a391ba0)
 
-- [ ] 实现 `findConfigFile()` 函数
-  - [ ] 查找 `./config.yaml`
-  - [ ] 查找 `./configs/config.yaml`
-  - [ ] 查找 `~/.pawstream/config.yaml`
-  - [ ] 添加日志输出（找到的路径）
+### 1.1 配置文件自动查找 ✅
+
+- [x] 实现 `findConfigFile()` 函数
+  - [x] 查找 `./config.yaml`
+  - [x] 查找 `./configs/config.yaml`
+  - [x] 查找 `~/.pawstream/config.yaml`
+  - [x] 添加日志输出（找到的路径）
   
-- [ ] 修改 `startCommand()`
-  - [ ] `--config` 参数变为可选
-  - [ ] 使用 `findConfigFile()` 自动查找
-  - [ ] 添加配置文件路径日志
+- [x] 修改 `startCommand()`
+  - [x] `--config` 参数变为可选
+  - [x] 使用 `findConfigFile()` 自动查找
+  - [x] 添加配置文件路径日志
 
-### 1.2 配置完整性检查
+### 1.2 配置完整性检查 ✅
 
-- [ ] 实现 `Config.IsComplete()` 方法
-  - [ ] 检查必需字段：device.id, device.secret, api.url
-  - [ ] 返回缺失字段列表
-  - [ ] 添加详细错误信息
+- [x] 实现 `Config.IsComplete()` 方法
+  - [x] 检查必需字段：device.id, device.secret, api.url
+  - [x] 返回缺失字段列表
+  - [x] 添加详细错误信息
   
-- [ ] 实现智能默认值
-  - [ ] input.type 默认为 "test"
-  - [ ] webui.enabled 默认为 true
-  - [ ] webui.port 默认为 8088
-  - [ ] mediamtx.url 默认为 "rtsp://localhost:8554"
+- [x] 实现智能默认值
+  - [x] input.type 默认为 "test"
+  - [x] webui.enabled 默认为 true
+  - [x] webui.port 默认为 8088
+  - [x] mediamtx.url 默认为 "rtsp://localhost:8554"
 
-### 1.3 命令行参数支持
+### 1.3 命令行参数支持 ✅
 
-- [ ] 添加核心命令行参数
-  - [ ] `--device-id` - 设备 ID
-  - [ ] `--device-secret` - 设备密钥
-  - [ ] `--api-url` - API 服务器地址
-  - [ ] `--input-type` - 输入源类型（已有）
-  - [ ] `--input-source` - 输入源路径
-  - [ ] `--mediamtx-url` - MediaMTX 地址
+- [x] 添加核心命令行参数
+  - [x] `--device-id` - 设备 ID
+  - [x] `--device-secret` - 设备密钥
+  - [x] `--api-url` - API 服务器地址
+  - [x] `--input-type` - 输入源类型（已有）
+  - [x] `--input-source` - 输入源路径
+  - [x] `--mediamtx-url` - MediaMTX 地址
   
-- [ ] 实现参数覆盖逻辑
-  - [ ] 命令行参数优先于配置文件
-  - [ ] 配置文件优先于默认值
-  - [ ] 添加日志显示最终使用的配置
+- [x] 实现参数覆盖逻辑
+  - [x] 命令行参数优先于配置文件
+  - [x] 配置文件优先于默认值
+  - [x] 添加日志显示最终使用的配置
 
-### 1.4 基础设置向导模式
+### 1.4 基础设置向导模式 ✅
 
-- [ ] 实现 `runSetupWizard()` 函数
-  - [ ] 检测配置完整性
-  - [ ] 显示缺失的配置项
-  - [ ] 启动 Web UI（仅 Web UI，不推流）
-  - [ ] 尝试自动打开浏览器
+- [x] 实现 `runSetupWizard()` 函数
+  - [x] 检测配置完整性
+  - [x] 显示缺失的配置项
+  - [x] 启动 Web UI（仅 Web UI，不推流）
+  - [x] 尝试自动打开浏览器
   
-- [ ] 添加设置向导提示
-  - [ ] 打印引导信息
-  - [ ] 显示 Web UI 地址
-  - [ ] 提示下一步操作
+- [x] 添加设置向导提示
+  - [x] 打印引导信息
+  - [x] 显示 Web UI 地址
+  - [x] 提示下一步操作
   
-- [ ] 实现配置等待逻辑
-  - [ ] 监听配置文件创建
-  - [ ] 验证配置完整性
-  - [ ] 询问用户是否启动
+- [x] 实现配置等待逻辑
+  - [x] 监听配置文件创建
+  - [x] 验证配置完整性
+  - [x] 询问用户是否启动
 
-### 1.5 文档更新
+### 1.5 文档更新 ✅
 
-- [ ] 更新 README.md
-  - [ ] 添加零配置启动说明
-  - [ ] 添加命令行参数文档
-  - [ ] 更新快速开始指南
+- [x] 更新 README.md
+  - [x] 添加零配置启动说明
+  - [x] 添加命令行参数文档
+  - [x] 更新快速开始指南
   
-- [ ] 添加配置文件模板
-  - [ ] 创建 `config.example.yaml`
-  - [ ] 添加详细注释
-  - [ ] 说明各字段用途
+- [x] 添加配置文件模板
+  - [x] 创建 `config.example.yaml`
+  - [x] 添加详细注释
+  - [x] 说明各字段用途
 
 ---
 
