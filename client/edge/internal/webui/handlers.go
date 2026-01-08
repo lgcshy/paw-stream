@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -324,6 +325,118 @@ func (h *Handler) DetectInputSources(c *fiber.Ctx) error {
 func (h *Handler) GetRecentLogs(c *fiber.Ctx) error {
 	entries := h.logBuffer.GetAll()
 	return c.JSON(entries)
+}
+
+// ExportConfig exports the current configuration as a downloadable file
+func (h *Handler) ExportConfig(c *fiber.Ctx) error {
+	// Read current config
+	data, err := os.ReadFile(h.configPath)
+	if err != nil {
+		h.logger.Error().Err(err).Msg("Failed to read config file for export")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error":   true,
+			"message": "Failed to read configuration",
+		})
+	}
+
+	// Set headers for file download
+	filename := fmt.Sprintf("pawstream-config-%s.yaml", time.Now().Format("20060102-150405"))
+	c.Set("Content-Type", "application/x-yaml")
+	c.Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
+	
+	h.logger.Info().Str("filename", filename).Msg("Config exported")
+	
+	return c.Send(data)
+}
+
+// ImportConfig imports a configuration file
+func (h *Handler) ImportConfig(c *fiber.Ctx) error {
+	// Get uploaded file
+	file, err := c.FormFile("config")
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error":   true,
+			"message": "No file uploaded",
+		})
+	}
+
+	// Validate file extension
+	if !strings.HasSuffix(file.Filename, ".yaml") && !strings.HasSuffix(file.Filename, ".yml") {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error":   true,
+			"message": "Invalid file type. Please upload a YAML file",
+		})
+	}
+
+	// Open uploaded file
+	src, err := file.Open()
+	if err != nil {
+		h.logger.Error().Err(err).Msg("Failed to open uploaded file")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error":   true,
+			"message": "Failed to read uploaded file",
+		})
+	}
+	defer src.Close()
+
+	// Read file content
+	data, err := io.ReadAll(src)
+	if err != nil {
+		h.logger.Error().Err(err).Msg("Failed to read file content")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error":   true,
+			"message": "Failed to read file content",
+		})
+	}
+
+	// Validate YAML syntax
+	var testConfig map[string]interface{}
+	if err := yaml.Unmarshal(data, &testConfig); err != nil {
+		h.logger.Error().Err(err).Msg("Invalid YAML in uploaded file")
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error":   true,
+			"message": "Invalid YAML format",
+		})
+	}
+
+	// Create backup of current config
+	backupPath := h.configPath + ".backup." + time.Now().Format("20060102-150405")
+	if err := copyFile(h.configPath, backupPath); err != nil {
+		h.logger.Warn().Err(err).Msg("Failed to create config backup")
+	} else {
+		h.logger.Info().Str("path", backupPath).Msg("Created config backup")
+	}
+
+	// Write new config
+	if err := os.WriteFile(h.configPath, data, 0644); err != nil {
+		h.logger.Error().Err(err).Msg("Failed to write imported config")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error":   true,
+			"message": "Failed to save configuration",
+		})
+	}
+
+	h.logger.Info().Str("filename", file.Filename).Msg("Config imported successfully")
+
+	// Trigger reload (non-blocking)
+	h.mu.RLock()
+	reloadChan := h.reloadChan
+	h.mu.RUnlock()
+
+	if reloadChan != nil {
+		select {
+		case reloadChan <- true:
+			h.logger.Info().Msg("Config reload triggered after import")
+		default:
+			h.logger.Debug().Msg("Reload already pending")
+		}
+	}
+
+	return c.JSON(fiber.Map{
+		"success": true,
+		"message": "Configuration imported and reload triggered",
+		"backup":  backupPath,
+	})
 }
 
 // copyFile copies a file

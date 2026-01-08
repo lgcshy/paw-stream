@@ -1,98 +1,122 @@
-.PHONY: help build test clean run install lint fmt vet tidy build-all
+.PHONY: build clean install uninstall run test help
 
-# Build variables
-BINARY_NAME=edge-client
-VERSION?=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
-BUILD_TIME=$(shell date -u '+%Y-%m-%d_%H:%M:%S')
-LDFLAGS=-ldflags "-X main.version=$(VERSION) -X main.buildTime=$(BUILD_TIME)"
+# 变量
+APP_NAME := edge-client
+BUILD_DIR := build
+CMD_DIR := cmd/edge-client
+VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+BUILD_TIME := $(shell date -u '+%Y-%m-%d_%H:%M:%S')
+LDFLAGS := -X main.version=$(VERSION) -X main.buildTime=$(BUILD_TIME)
 
-# Go parameters
-GOCMD=go
-GOBUILD=$(GOCMD) build
-GOTEST=$(GOCMD) test
-GOGET=$(GOCMD) get
-GOMOD=$(GOCMD) mod
-GOFMT=$(GOCMD) fmt
-GOVET=$(GOCMD) vet
-
-# Build output directory
-BUILD_DIR=build
-
-help: ## Show this help message
-	@echo 'Usage: make [target]'
-	@echo ''
-	@echo 'Available targets:'
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
-
-build: ## Build the binary for current platform
-	@echo "Building $(BINARY_NAME) $(VERSION)..."
-	@mkdir -p $(BUILD_DIR)
-	$(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) ./cmd/edge-client
-
-build-linux-amd64: ## Build for Linux AMD64
-	@echo "Building for Linux AMD64..."
-	@mkdir -p $(BUILD_DIR)
-	GOOS=linux GOARCH=amd64 $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-linux-amd64 ./cmd/edge-client
-
-build-linux-arm64: ## Build for Linux ARM64 (Raspberry Pi)
-	@echo "Building for Linux ARM64..."
-	@mkdir -p $(BUILD_DIR)
-	GOOS=linux GOARCH=arm64 $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-linux-arm64 ./cmd/edge-client
-
-build-linux-arm: ## Build for Linux ARM (Raspberry Pi 32-bit)
-	@echo "Building for Linux ARM..."
-	@mkdir -p $(BUILD_DIR)
-	GOOS=linux GOARCH=arm GOARM=7 $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-linux-arm ./cmd/edge-client
-
-build-windows: ## Build for Windows AMD64
-	@echo "Building for Windows AMD64..."
-	@mkdir -p $(BUILD_DIR)
-	GOOS=windows GOARCH=amd64 $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-windows-amd64.exe ./cmd/edge-client
-
-build-macos: ## Build for macOS (both architectures)
-	@echo "Building for macOS AMD64..."
-	@mkdir -p $(BUILD_DIR)
-	GOOS=darwin GOARCH=amd64 $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-darwin-amd64 ./cmd/edge-client
-	@echo "Building for macOS ARM64..."
-	GOOS=darwin GOARCH=arm64 $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-darwin-arm64 ./cmd/edge-client
-
-build-all: build-linux-amd64 build-linux-arm64 build-linux-arm build-windows build-macos ## Build for all platforms
-	@echo "All builds complete!"
-
-run: ## Run the application
-	$(GOCMD) run ./cmd/edge-client --config configs/config.example.yaml
-
-test: ## Run tests
-	$(GOTEST) -v -race -coverprofile=coverage.out ./...
-
-test-coverage: test ## Run tests with coverage report
-	$(GOCMD) tool cover -html=coverage.out -o coverage.html
-	@echo "Coverage report generated: coverage.html"
-
-clean: ## Clean build artifacts
-	@echo "Cleaning..."
-	@rm -rf $(BUILD_DIR)
-	@rm -f coverage.out coverage.html
-	@echo "Clean complete!"
-
-install: build ## Install the binary to $GOPATH/bin
-	@echo "Installing $(BINARY_NAME)..."
-	@cp $(BUILD_DIR)/$(BINARY_NAME) $(GOPATH)/bin/
-	@echo "Installed to $(GOPATH)/bin/$(BINARY_NAME)"
-
-fmt: ## Format code
-	$(GOFMT) ./...
-
-vet: ## Run go vet
-	$(GOVET) ./...
-
-lint: ## Run golangci-lint (requires golangci-lint to be installed)
-	golangci-lint run
-
-tidy: ## Tidy go.mod
-	$(GOMOD) tidy
-
-deps: ## Download dependencies
-	$(GOMOD) download
-
+# 默认目标
 .DEFAULT_GOAL := help
+
+## build: 编译 Edge Client
+build:
+	@echo "📦 编译 Edge Client..."
+	@mkdir -p $(BUILD_DIR)
+	go build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(APP_NAME) ./$(CMD_DIR)
+	@echo "✅ 编译完成: $(BUILD_DIR)/$(APP_NAME)"
+
+## build-all: 编译所有平台的二进制文件
+build-all:
+	@echo "📦 编译所有平台..."
+	@mkdir -p $(BUILD_DIR)
+	
+	# Linux AMD64
+	GOOS=linux GOARCH=amd64 go build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(APP_NAME)-linux-amd64 ./$(CMD_DIR)
+	
+	# Linux ARM64
+	GOOS=linux GOARCH=arm64 go build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(APP_NAME)-linux-arm64 ./$(CMD_DIR)
+	
+	# Linux ARMv7
+	GOOS=linux GOARCH=arm GOARM=7 go build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(APP_NAME)-linux-armv7 ./$(CMD_DIR)
+	
+	# macOS AMD64
+	GOOS=darwin GOARCH=amd64 go build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(APP_NAME)-darwin-amd64 ./$(CMD_DIR)
+	
+	# macOS ARM64 (Apple Silicon)
+	GOOS=darwin GOARCH=arm64 go build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(APP_NAME)-darwin-arm64 ./$(CMD_DIR)
+	
+	# Windows AMD64
+	GOOS=windows GOARCH=amd64 go build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(APP_NAME)-windows-amd64.exe ./$(CMD_DIR)
+	
+	@echo "✅ 所有平台编译完成"
+
+## clean: 清理编译产物
+clean:
+	@echo "🧹 清理编译产物..."
+	rm -rf $(BUILD_DIR)
+	@echo "✅ 清理完成"
+
+## install: 安装 Edge Client（需要 root 权限）
+install: build
+	@echo "📥 安装 Edge Client..."
+	@if [ "$$(id -u)" -ne 0 ]; then \
+		echo "⚠️  需要 root 权限，请使用: sudo make install"; \
+		exit 1; \
+	fi
+	./install.sh
+
+## uninstall: 卸载 Edge Client（需要 root 权限）
+uninstall:
+	@echo "🗑️  卸载 Edge Client..."
+	@if [ "$$(id -u)" -ne 0 ]; then \
+		echo "⚠️  需要 root 权限，请使用: sudo make uninstall"; \
+		exit 1; \
+	fi
+	./uninstall.sh
+
+## run: 运行 Edge Client（开发模式）
+run: build
+	@echo "🚀 运行 Edge Client..."
+	./$(BUILD_DIR)/$(APP_NAME) start
+
+## test: 运行测试
+test:
+	@echo "🧪 运行测试..."
+	go test -v ./...
+
+## fmt: 格式化代码
+fmt:
+	@echo "✨ 格式化代码..."
+	go fmt ./...
+	@echo "✅ 格式化完成"
+
+## lint: 代码检查
+lint:
+	@echo "🔍 代码检查..."
+	@if command -v golangci-lint >/dev/null 2>&1; then \
+		golangci-lint run ./...; \
+	else \
+		echo "⚠️  golangci-lint 未安装，跳过检查"; \
+		echo "安装: curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $$(go env GOPATH)/bin"; \
+	fi
+
+## deps: 下载依赖
+deps:
+	@echo "📦 下载依赖..."
+	go mod download
+	go mod tidy
+	@echo "✅ 依赖下载完成"
+
+## version: 显示版本信息
+version:
+	@echo "Edge Client"
+	@echo "Version: $(VERSION)"
+	@echo "Build Time: $(BUILD_TIME)"
+
+## help: 显示帮助信息
+help:
+	@echo "PawStream Edge Client - Makefile"
+	@echo ""
+	@echo "可用命令:"
+	@echo ""
+	@sed -n 's/^##//p' $(MAKEFILE_LIST) | column -t -s ':' | sed -e 's/^/  /'
+	@echo ""
+	@echo "示例:"
+	@echo "  make build          # 编译"
+	@echo "  make run            # 编译并运行"
+	@echo "  sudo make install   # 安装到系统"
+	@echo "  sudo make uninstall # 从系统卸载"
+	@echo ""

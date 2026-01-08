@@ -100,6 +100,8 @@ func (s *Server) setupRoutes() {
 	// Configuration
 	api.Get("/config", s.handler.GetConfig)
 	api.Post("/config", s.handler.SaveConfig)
+	api.Get("/config/export", s.handler.ExportConfig)
+	api.Post("/config/import", s.handler.ImportConfig)
 
 	// Status and system info
 	api.Get("/status", s.handler.GetStatus)

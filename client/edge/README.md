@@ -20,7 +20,32 @@ PawStream 边缘推流客户端 - 部署在摄像头设备上的轻量级 Go 应
 
 ## 快速开始
 
-### 安装
+### 方式1: 一键安装（推荐）
+
+**自动安装到系统**：
+
+```bash
+# 克隆仓库
+git clone https://github.com/lgc/pawstream.git
+cd pawstream/client/edge
+
+# 编译并安装
+make build
+sudo make install
+```
+
+安装脚本将自动：
+- ✅ 安装到 `/opt/pawstream`
+- ✅ 创建配置目录 `/etc/pawstream`
+- ✅ 安装 systemd 服务
+- ✅ 创建示例配置文件
+
+**卸载**：
+```bash
+sudo make uninstall
+```
+
+### 方式2: 手动安装
 
 ```bash
 # 从源码编译
