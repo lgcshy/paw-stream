@@ -49,6 +49,7 @@ func (m *SSEManager) Handler(c *fiber.Ctx) error {
 	c.Set("Cache-Control", "no-cache")
 	c.Set("Connection", "keep-alive")
 	c.Set("Transfer-Encoding", "chunked")
+	c.Set("X-Accel-Buffering", "no") // Disable nginx buffering
 
 	// Generate client ID
 	clientID := fmt.Sprintf("%s-%d", c.IP(), time.Now().UnixNano())
@@ -76,20 +77,21 @@ func (m *SSEManager) Handler(c *fiber.Ctx) error {
 		m.logger.Debug().Str("client", clientID).Msg("SSE client disconnected")
 	}()
 
-	// Send initial connection event
-	initialEvent := SSEEvent{
-		Type: "connected",
-		Data: map[string]interface{}{
-			"timestamp": time.Now(),
-			"message":   "Connected to PawStream Edge Client",
-		},
-	}
-	if data, err := json.Marshal(initialEvent); err == nil {
-		c.WriteString(fmt.Sprintf("data: %s\n\n", data))
-	}
-
 	// Keep connection alive and send messages
 	c.Context().SetBodyStreamWriter(func(w *bufio.Writer) {
+		// Send initial connection event
+		initialEvent := SSEEvent{
+			Type: "connected",
+			Data: map[string]interface{}{
+				"timestamp": time.Now(),
+				"message":   "Connected to PawStream Edge Client",
+			},
+		}
+		if data, err := json.Marshal(initialEvent); err == nil {
+			fmt.Fprintf(w, "data: %s\n\n", data)
+			w.Flush()
+		}
+
 		ticker := time.NewTicker(30 * time.Second)
 		defer ticker.Stop()
 
