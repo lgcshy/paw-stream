@@ -92,11 +92,11 @@ Web UI SHALL 提供【状态】标签页，实时显示客户端运行状态。
 
 #### Scenario: 状态实时更新
 - **WHEN** 推流状态发生变化（如从离线变为在线，或配置重载）
-- **THEN** 【状态】标签页应通过 WebSocket 自动更新显示，无需刷新页面
+- **THEN** 【状态】标签页应通过 SSE (Server-Sent Events) 自动更新显示，无需刷新页面
 
-#### Scenario: WebSocket 断线重连
-- **WHEN** WebSocket 连接意外断开
-- **THEN** 应自动尝试重新连接，并在连接恢复后继续接收状态更新
+#### Scenario: SSE 断线重连
+- **WHEN** SSE 连接意外断开
+- **THEN** 浏览器应自动尝试重新连接（SSE 原生支持），并在连接恢复后继续接收状态更新
 
 ### Requirement: 日志查看
 Web UI SHALL 提供【日志】标签页，显示客户端日志信息。
@@ -111,7 +111,7 @@ Web UI SHALL 提供【日志】标签页，显示客户端日志信息。
 
 #### Scenario: 日志实时推送
 - **WHEN** 客户端产生新日志
-- **THEN** 应通过 WebSocket 实时推送到【日志】标签页，自动添加到日志列表并滚动到底部
+- **THEN** 应通过 SSE (Server-Sent Events) 实时推送到【日志】标签页，自动添加到日志列表并滚动到底部
 
 #### Scenario: 日志过滤
 - **WHEN** 用户选择日志级别过滤（如仅显示 WARN 和 ERROR）
@@ -192,6 +192,6 @@ Web UI SHALL 保持低资源占用。
 - **WHEN** 最多 5 个客户端同时访问 Web UI
 - **THEN** 应保持正常响应速度，不影响推流性能
 
-#### Scenario: WebSocket 连接稳定性
-- **WHEN** WebSocket 连接建立后持续 24 小时
-- **THEN** 连接应保持稳定，不发生内存泄漏或性能下降
+#### Scenario: SSE 连接稳定性
+- **WHEN** SSE 连接建立后持续 24 小时
+- **THEN** 连接应保持稳定，不发生内存泄漏或性能下降，每个 SSE 连接占用内存不超过 1MB

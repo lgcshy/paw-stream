@@ -15,15 +15,17 @@
   - [ ] 重启推流
   - [ ] 记录重载日志
 
-### 2. Web UI 后端模块
-- [ ] 2.1 创建 `internal/webui/` 模块目录结构
-- [ ] 2.2 实现 HTTP 服务器（`server.go`）
-  - [ ] 基础 HTTP 服务器
-  - [ ] 静态文件服务
-  - [ ] 可选的 HTTP Basic Auth
+### 2. Web UI 后端模块（fiber）
+- [ ] 2.1 添加 fiber 框架依赖到 `go.mod`
+- [ ] 2.2 创建 `internal/webui/` 模块目录结构
+- [ ] 2.3 实现 fiber HTTP 服务器（`server.go`）
+  - [ ] 初始化 fiber 应用
+  - [ ] 配置静态文件服务（embed）
+  - [ ] 可选的 HTTP Basic Auth 中间件
   - [ ] 优雅关闭支持
-- [ ] 2.3 实现静态资源嵌入（`embedded.go`，使用 `embed`）
-- [ ] 2.4 实现 RESTful API 处理器（`handlers.go`）
+  - [ ] CORS 配置（可选）
+- [ ] 2.4 实现静态资源嵌入（`embedded.go`，使用 `embed`）
+- [ ] 2.5 实现 RESTful API 处理器（`handlers.go`）
   - [ ] GET /api/status - 获取客户端状态
   - [ ] GET /api/config - 获取当前配置
   - [ ] POST /api/config - 保存配置（写入 config.yaml）
@@ -33,12 +35,21 @@
   - [ ] POST /api/devices - 创建设备
   - [ ] GET /api/input-sources - 检测可用输入源
   - [ ] GET /api/logs/recent - 获取最近日志
-  - [ ] GET /api/system/info - 获取系统信息
-- [ ] 2.5 实现 WebSocket 服务（`websocket.go`）
-  - [ ] 建立 WebSocket 连接
-  - [ ] 推送实时状态更新
-  - [ ] 推送配置重载事件
-  - [ ] 推送新日志行
+- [ ] 2.6 实现系统信息获取（`system.go`，使用 gopsutil）
+  - [ ] 添加 gopsutil 依赖
+  - [ ] CPU 使用率获取
+  - [ ] 内存使用获取
+  - [ ] 磁盘空间获取
+  - [ ] 进程信息获取
+  - [ ] 定期更新系统信息（每 5 秒）
+- [ ] 2.7 实现 SSE 服务（`sse.go`）
+  - [ ] GET /api/events - SSE 端点
+  - [ ] 管理 SSE 客户端连接
+  - [ ] 广播状态更新事件
+  - [ ] 广播配置重载事件
+  - [ ] 广播日志事件
+  - [ ] 广播系统信息事件
+  - [ ] 客户端断开清理
 
 ## Phase 2: 前端页面开发
 
@@ -89,10 +100,12 @@
   - [ ] 设备名称和 ID
   - [ ] API 服务器地址
   - [ ] 客户端版本
-- [ ] 5.4 实时更新（WebSocket）
-  - [ ] 连接 WebSocket
-  - [ ] 处理状态更新消息
-  - [ ] 自动重连
+- [ ] 5.4 实时更新（SSE）
+  - [ ] 连接 SSE（EventSource）
+  - [ ] 处理 status_update 事件
+  - [ ] 处理 config_reloaded 事件
+  - [ ] 处理 system_info 事件
+  - [ ] 自动重连（浏览器原生支持）
 
 ### 6. 日志标签页
 - [ ] 6.1 日志列表显示
@@ -103,17 +116,18 @@
   - [ ] 级别过滤（info, warn, error）
   - [ ] 关键词搜索
   - [ ] 清空日志按钮
-- [ ] 6.3 实时日志推送（WebSocket）
-  - [ ] 接收新日志行
+- [ ] 6.3 实时日志推送（SSE）
+  - [ ] 监听 log_entry 事件
   - [ ] 增量更新显示
+  - [ ] 自动滚动到底部
 
 ### 7. 前端逻辑
 - [ ] 7.1 实现核心 JavaScript（`app.js`）
-  - [ ] API 调用封装
-  - [ ] 标签页切换
+  - [ ] API 调用封装（fetch）
+  - [ ] 标签页切换逻辑
   - [ ] 表单验证
   - [ ] 错误处理和显示
-  - [ ] WebSocket 管理
+  - [ ] SSE 事件管理（EventSource）
 - [ ] 7.2 实现首次配置引导
   - [ ] 检测是否已配置
   - [ ] 显示配置向导提示
@@ -174,7 +188,8 @@
 - [ ] 10.5 性能测试
   - [ ] 长时间运行稳定性
   - [ ] 资源占用监控
-  - [ ] WebSocket 连接稳定性
+  - [ ] SSE 连接稳定性
+  - [ ] gopsutil 性能影响测试
 
 ### 11. 文档
 - [ ] 11.1 更新 README.md

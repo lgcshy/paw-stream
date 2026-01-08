@@ -29,10 +29,11 @@
 - **纯静态实现** - HTML/JS/CSS，无需额外依赖，嵌入到 Go 二进制
 
 ### 技术方案
-- 使用 Go 标准库 `net/http` 提供 HTTP 服务器
+- 使用 **fiber** 框架提供 HTTP 服务器（与 API 服务器统一技术栈）
 - 使用 `embed` 打包静态资源（HTML/JS/CSS）
 - 使用 `fsnotify` 监控配置文件变化，实现热重载
-- 提供 RESTful API + WebSocket 供前端调用
+- 使用 **SSE (Server-Sent Events)** 实现实时推送（更轻量）
+- 使用 **gopsutil** 获取系统信息（跨平台）
 - 前端使用 Vanilla JS（无框架依赖）
 
 ### Web UI 界面结构
@@ -48,7 +49,7 @@
 └─────────────────────────────────────┘
 ```
 
-### 命令简化
+### 命令设计（简洁）
 ```bash
 edge-client start              # 启动推流 + Web UI（默认端口 8080）
 edge-client start --daemon     # 后台运行 + Web UI
@@ -56,16 +57,18 @@ edge-client start --no-webui   # 仅推流，不启动 Web UI
 edge-client stop               # 停止
 edge-client restart            # 重启
 edge-client status             # 命令行快速查看状态
+edge-client version            # 版本信息
 ```
 
-**移除的命令**：
-- `setup` - 不再需要，Web UI 一直可访问
-- `dashboard` - 不再需要，Web UI 就是管理界面
+**设计理念**：
+- 保持命令简洁，避免引入不必要的子命令
+- Web UI 作为 `start` 命令的默认功能，无需单独命令
+- 提供 `--no-webui` 选项给不需要 Web UI 的场景
 
 ### Web UI 生命周期
 - **默认行为** - 随 `start` 命令启动，监听端口 8080
 - **持续运行** - 推流过程中 Web UI 一直可访问
-- **资源消耗** - HTTP 服务器空闲时仅占用 ~5MB 内存
+- **资源消耗** - HTTP 服务器空闲时仅占用 ~5MB 内存，SSE 连接占用极少
 - **访问方式** - 局域网任何设备通过 `http://设备IP:8080` 访问
 
 ### 配置热重载机制
@@ -73,7 +76,29 @@ edge-client status             # 命令行快速查看状态
 - 任何方式修改配置（Web UI 保存 或 手动编辑）都会触发热重载
 - 检测到变化后，优雅停止当前推流，重新加载配置，重启推流
 - 整个过程无需重启客户端进程
-- Web UI 通过 WebSocket 实时更新状态
+- Web UI 通过 SSE 实时接收状态更新
+
+### 实时推送机制（SSE）
+**为什么选择 SSE 而非 WebSocket**：
+- ✅ 更轻量 - 基于 HTTP，无需协议升级
+- ✅ 更简单 - 单向推送，代码量更少
+- ✅ 自动重连 - 浏览器原生支持
+- ✅ 足够用 - 状态更新和日志推送不需要双向通信
+- ✅ 更省内存 - 每个连接占用资源更少
+
+**SSE 推送内容**：
+```
+事件类型：
+- status_update: 推流状态变化
+- config_reloaded: 配置重载完成
+- log_entry: 新日志行
+- system_info: 系统资源更新（每 5 秒）
+```
+
+### 系统监控（gopsutil）
+- 跨平台获取 CPU 使用率、内存使用、磁盘空间
+- 网络流量统计（可选）
+- 进程信息（运行时长、PID）
 
 ### 设备发现
 - 固定端口 8080
@@ -90,11 +115,18 @@ edge-client status             # 命令行快速查看状态
 
 ### 受影响的组件
 - **edge-client** - 主要变更
-  - 新增 `internal/webui/` 模块（HTTP 服务器、API 处理器、静态资源、WebSocket）
+  - 新增 `internal/webui/` 模块（fiber HTTP 服务器、API 处理器、SSE 服务、静态资源）
   - 新增 `web/` 目录（HTML/JS/CSS 源文件）
   - 修改主程序默认启动 Web UI
   - 新增 `fsnotify` 配置文件监控机制
-  - 移除 `setup` 和 `dashboard` 子命令
+  - 新增 `gopsutil` 系统信息获取
+
+### 新增依赖
+```go
+github.com/gofiber/fiber/v2        // HTTP 框架
+github.com/fsnotify/fsnotify       // 配置监控
+github.com/shirou/gopsutil/v3      // 系统信息
+```
 
 ### 受影响的规格
 - `edge-client` - 新增 Web UI 管理界面相关需求
@@ -107,15 +139,28 @@ edge-client status             # 命令行快速查看状态
 - ✅ 无需学习 YAML 语法和命令行
 - ✅ 符合现代物联网设备使用习惯（如路由器、NAS）
 
+### 技术优势
+- ✅ **fiber 框架** - 与 API 服务器技术栈统一，开发效率高
+- ✅ **SSE 推送** - 比 WebSocket 更轻量，资源占用更少
+- ✅ **gopsutil** - 跨平台系统监控，功能完善
+- ✅ **配置热重载** - fsnotify 成熟可靠，MediaMTX 已验证
+
 ### 技术债务
-- 新增 Go HTTP 服务器代码（~1000 行）
-- 新增 fsnotify 依赖
+- 新增 Go HTTP 服务器代码（~800 行，fiber 简化开发）
+- 新增 3 个依赖库（fiber、fsnotify、gopsutil）
 - 新增前端静态资源（预计 < 100KB）
-- 二进制文件大小增加约 200-300KB
+- 二进制文件大小增加约 2-3MB（主要是 fiber 和 gopsutil）
 
 ### 风险
 - **极低风险** - Web UI 可通过 `--no-webui` 选项禁用
-- **资源可控** - HTTP 服务器资源消耗极小（~5MB 内存）
+- **资源可控** - HTTP 服务器 ~5MB 内存，SSE 连接占用极少
 - **安全可控** - 局域网隔离 + 可选认证
 - **兼容性** - 保持向后兼容，配置文件格式不变
 - **热重载稳定性** - fsnotify 是成熟的库，MediaMTX 等项目已验证
+- **依赖风险** - 所有依赖库都是成熟、广泛使用的库
+
+### 性能预期
+- HTTP 服务器空闲：~5MB 内存，0% CPU
+- SSE 连接（5 个客户端）：< 1MB 额外内存
+- 配置热重载：< 100ms 停机时间
+- 系统信息获取：< 10ms，每 5 秒更新一次
