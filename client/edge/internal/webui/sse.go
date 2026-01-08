@@ -76,11 +76,24 @@ func (m *SSEManager) Handler(c *fiber.Ctx) error {
 
 		// Cleanup when stream ends
 		defer func() {
+			// Recover from panic if channel is already closed
+			defer func() {
+				if r := recover(); r != nil {
+					m.logger.Warn().Str("client", clientID).Interface("panic", r).Msg("Recovered from panic during cleanup")
+				}
+			}()
+
 			m.mu.Lock()
-			delete(m.clients, clientID)
-			close(msgChan)
-			m.mu.Unlock()
-			m.logger.Info().Str("client", clientID).Msg("SSE client disconnected")
+			defer m.mu.Unlock()
+
+			// Remove client from map
+			if _, exists := m.clients[clientID]; exists {
+				delete(m.clients, clientID)
+				close(msgChan)
+				m.logger.Info().Str("client", clientID).Msg("SSE client disconnected")
+			} else {
+				m.logger.Debug().Str("client", clientID).Msg("SSE client already cleaned up")
+			}
 		}()
 
 		// Send initial connection event
