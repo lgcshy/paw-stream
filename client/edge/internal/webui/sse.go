@@ -45,11 +45,11 @@ func NewSSEManager(logger zerolog.Logger) *SSEManager {
 
 // Handler handles SSE connections
 func (m *SSEManager) Handler(c *fiber.Ctx) error {
+	// Set SSE headers
 	c.Set("Content-Type", "text/event-stream")
 	c.Set("Cache-Control", "no-cache")
 	c.Set("Connection", "keep-alive")
-	c.Set("Transfer-Encoding", "chunked")
-	c.Set("X-Accel-Buffering", "no") // Disable nginx buffering
+	c.Set("X-Accel-Buffering", "no")
 
 	// Generate client ID
 	clientID := fmt.Sprintf("%s-%d", c.IP(), time.Now().UnixNano())
@@ -66,7 +66,7 @@ func (m *SSEManager) Handler(c *fiber.Ctx) error {
 	m.clients[clientID] = msgChan
 	m.mu.Unlock()
 
-	m.logger.Debug().Str("client", clientID).Msg("SSE client connected")
+	m.logger.Info().Str("client", clientID).Msg("SSE client connected")
 
 	// Cleanup on disconnect
 	defer func() {
@@ -74,11 +74,11 @@ func (m *SSEManager) Handler(c *fiber.Ctx) error {
 		delete(m.clients, clientID)
 		close(msgChan)
 		m.mu.Unlock()
-		m.logger.Debug().Str("client", clientID).Msg("SSE client disconnected")
+		m.logger.Info().Str("client", clientID).Msg("SSE client disconnected")
 	}()
 
-	// Keep connection alive and send messages
-	c.Context().SetBodyStreamWriter(func(w *bufio.Writer) {
+	// Use SetBodyStreamWriter to handle streaming
+	c.Status(fiber.StatusOK).Context().SetBodyStreamWriter(func(w *bufio.Writer) {
 		// Send initial connection event
 		initialEvent := SSEEvent{
 			Type: "connected",
@@ -88,30 +88,37 @@ func (m *SSEManager) Handler(c *fiber.Ctx) error {
 			},
 		}
 		if data, err := json.Marshal(initialEvent); err == nil {
-			fmt.Fprintf(w, "data: %s\n\n", data)
-			w.Flush()
+			w.WriteString(fmt.Sprintf("data: %s\n\n", string(data)))
+			if err := w.Flush(); err != nil {
+				m.logger.Error().Err(err).Str("client", clientID).Msg("Failed to send initial event")
+				return
+			}
 		}
 
-		ticker := time.NewTicker(30 * time.Second)
+		// Ping ticker
+		ticker := time.NewTicker(15 * time.Second)
 		defer ticker.Stop()
 
+		// Event loop
 		for {
 			select {
 			case msg, ok := <-msgChan:
 				if !ok {
+					m.logger.Info().Str("client", clientID).Msg("Message channel closed")
 					return
 				}
-				fmt.Fprintf(w, "data: %s\n\n", msg)
+				// Send event
+				w.WriteString(fmt.Sprintf("data: %s\n\n", string(msg)))
 				if err := w.Flush(); err != nil {
-					m.logger.Debug().Err(err).Str("client", clientID).Msg("SSE write error")
+					m.logger.Warn().Err(err).Str("client", clientID).Msg("Failed to send event")
 					return
 				}
 
 			case <-ticker.C:
-				// Send keep-alive ping
-				fmt.Fprintf(w, ": ping\n\n")
+				// Send keep-alive comment
+				w.WriteString(": keepalive\n\n")
 				if err := w.Flush(); err != nil {
-					m.logger.Debug().Err(err).Str("client", clientID).Msg("SSE ping error")
+					m.logger.Warn().Err(err).Str("client", clientID).Msg("Failed to send keepalive")
 					return
 				}
 			}
