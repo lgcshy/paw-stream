@@ -10,7 +10,8 @@ PawStream 边缘推流客户端 - 部署在摄像头设备上的轻量级 Go 应
 - ✅ 配置文件和环境变量管理
 - ✅ 结构化日志记录（zerolog）
 - ✅ 优雅启动和关闭
-- ✅ Systemd 服务支持
+- ✅ **Daemon 模式支持**（前台/后台运行）
+- ✅ Systemd 服务支持（生产环境推荐）
 - ✅ 跨平台支持（Linux、Windows、macOS）
 - ✅ 可选的健康检查 HTTP 端点
 
@@ -89,14 +90,32 @@ export PAWSTREAM_INPUT_SOURCE="/dev/video0"
 ### 运行
 
 ```bash
-# 使用配置文件
+# 查看帮助
+./edge-client
+
+# 查看版本
+./edge-client version
+
+# 前台运行（按 Ctrl+C 停止）
 ./edge-client start --config config.yaml
 
-# 使用环境变量
-./edge-client start
+# 后台运行（daemon 模式）
+./edge-client start --config config.yaml --daemon
+
+# 查看状态
+./edge-client status
+
+# 停止运行
+./edge-client stop
+
+# 重启
+./edge-client restart
 
 # 测试模式（生成测试画面）
 ./edge-client start --config config.yaml --input-type test
+
+# 调试模式
+./edge-client start --config config.yaml --log-level debug
 ```
 
 ### Systemd 服务
