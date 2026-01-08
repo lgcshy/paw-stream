@@ -44,8 +44,9 @@ func NewServer(cfg Config, handler *Handler, sseManager *SSEManager, logger zero
 		DisableStartupMessage: true,
 		ErrorHandler:          errorHandler,
 		ReadTimeout:           10 * time.Second,
-		WriteTimeout:          10 * time.Second,
+		WriteTimeout:          0, // Disable write timeout for SSE streaming
 		IdleTimeout:           120 * time.Second,
+		StreamRequestBody:     true, // Enable streaming
 	})
 
 	// Middleware
