@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -221,4 +222,72 @@ func (c *Config) Validate() error {
 	}
 
 	return nil
+}
+
+// FindConfigFile searches for configuration file in standard locations
+// Returns the path to the first found configuration file, or empty string if none found
+func FindConfigFile() string {
+	// Get home directory
+	home, err := os.UserHomeDir()
+	if err != nil {
+		home = ""
+	}
+
+	// Search paths in priority order
+	searchPaths := []string{
+		"./config.yaml",
+		"./configs/config.yaml",
+	}
+
+	// Add home directory path if available
+	if home != "" {
+		searchPaths = append(searchPaths, filepath.Join(home, ".pawstream", "config.yaml"))
+	}
+
+	// Search for config file
+	for _, path := range searchPaths {
+		absPath, err := filepath.Abs(path)
+		if err != nil {
+			continue
+		}
+
+		if _, err := os.Stat(absPath); err == nil {
+			return absPath
+		}
+	}
+
+	return ""
+}
+
+// IsComplete checks if the configuration has all required fields
+func (c *Config) IsComplete() bool {
+	// Check required fields
+	if c.Device.ID == "" {
+		return false
+	}
+	if c.Device.Secret == "" {
+		return false
+	}
+	if c.API.URL == "" {
+		return false
+	}
+
+	return true
+}
+
+// MissingFields returns a list of missing required fields
+func (c *Config) MissingFields() []string {
+	var missing []string
+
+	if c.Device.ID == "" {
+		missing = append(missing, "device.id")
+	}
+	if c.Device.Secret == "" {
+		missing = append(missing, "device.secret")
+	}
+	if c.API.URL == "" {
+		missing = append(missing, "api.url")
+	}
+
+	return missing
 }

@@ -32,6 +32,26 @@ make build
 # wget https://github.com/lgc/pawstream/releases/latest/download/edge-client-linux-arm64
 ```
 
+### 首次使用（零配置）
+
+**小白用户 - 只需一条命令：**
+
+```bash
+# 启动客户端（自动进入设置向导）
+./edge-client start
+
+# 或后台运行
+./edge-client start --daemon
+```
+
+**设置向导会自动：**
+1. 🔍 检测配置文件
+2. 🌐 启动 Web UI (http://localhost:8088/setup)
+3. 🔗 打开浏览器
+4. 📝 引导您完成配置
+5. 💾 自动生成配置文件
+6. 🚀 启动推流
+
 ### 配置
 
 创建配置文件 `config.yaml`：
@@ -102,6 +122,27 @@ export PAWSTREAM_INPUT_SOURCE="/dev/video0"
 
 ### 运行
 
+#### 小白用户（推荐）
+
+```bash
+# 首次运行 - 自动进入设置向导
+./edge-client start
+
+# 后续运行 - 使用已保存的配置
+./edge-client start
+
+# 后台运行
+./edge-client start --daemon
+
+# 查看状态
+./edge-client status
+
+# 停止
+./edge-client stop
+```
+
+#### 开发人员（高级配置）
+
 ```bash
 # 查看帮助
 ./edge-client
@@ -109,26 +150,42 @@ export PAWSTREAM_INPUT_SOURCE="/dev/video0"
 # 查看版本
 ./edge-client version
 
-# 前台运行（按 Ctrl+C 停止）
-./edge-client start --config config.yaml
+# 使用自定义配置文件
+./edge-client start --config /path/to/config.yaml
 
-# 后台运行（daemon 模式）
-./edge-client start --config config.yaml --daemon
+# 使用命令行参数（覆盖配置文件）
+./edge-client start \
+  --device-id d3cf4e12-a4f0-4066-a7b6-74b22ff8cffd \
+  --device-secret "your-secret" \
+  --api-url http://api.example.com
 
-# 查看状态
-./edge-client status
+# 组合使用配置文件和参数
+./edge-client start --config config.yaml --input-type test
 
-# 停止运行
-./edge-client stop
+# 完全命令行配置（无需配置文件）
+./edge-client start \
+  --device-id xxx \
+  --device-secret yyy \
+  --api-url http://api.example.com \
+  --input-type v4l2 \
+  --input-source /dev/video0
+
+# 调试模式
+./edge-client start --log-level debug
 
 # 重启
 ./edge-client restart
+```
 
-# 测试模式（生成测试画面）
-./edge-client start --config config.yaml --input-type test
+#### 配置文件自动查找
 
-# 调试模式
-./edge-client start --config config.yaml --log-level debug
+如果不指定 `--config`，将按以下顺序自动查找：
+
+1. `./config.yaml`
+2. `./configs/config.yaml`
+3. `~/.pawstream/config.yaml`
+
+找不到配置文件时，自动进入设置向导模式。
 ```
 
 ### Web UI 管理界面

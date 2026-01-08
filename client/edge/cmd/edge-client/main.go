@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"sync/atomic"
@@ -72,16 +73,41 @@ Commands:
   version     Show version information
 
 Start Options:
-  --config PATH       Path to config file (required)
-  --daemon            Run as daemon in background
-  --log-level LEVEL   Log level (debug, info, warn, error)
-  --input-type TYPE   Override input type (v4l2, rtsp, file, test)
+  --config PATH           Path to config file (optional, auto-search if not specified)
+  --daemon                Run as daemon in background
+  
+  Core Configuration (overrides config file):
+  --device-id ID          Device ID
+  --device-secret SECRET  Device secret
+  --api-url URL           API server URL
+  
+  Input Configuration (overrides config file):
+  --input-type TYPE       Input type: v4l2, rtsp, file, test
+  --input-source SOURCE   Input source path or URL
+  --mediamtx-url URL      MediaMTX server URL
+  
+  Other Options:
+  --log-level LEVEL       Log level: debug, info, warn, error
+
+Configuration File Search Order:
+  1. ./config.yaml
+  2. ./configs/config.yaml
+  3. ~/.pawstream/config.yaml
 
 Examples:
-  edge-client start --config config.yaml
-  edge-client start --config config.yaml --daemon
+  # Small user (zero-config)
+  edge-client start                    # Auto-search config or enter setup wizard
+  edge-client start --daemon           # Run in background
+  
+  # Developer (advanced)
+  edge-client start --config my.yaml   # Use custom config
+  edge-client start --device-id xxx --device-secret yyy --api-url http://...
+  edge-client start --config my.yaml --input-type test
+  
+  # Management
   edge-client stop
   edge-client status
+  edge-client restart
 
 `, version)
 }
@@ -92,16 +118,43 @@ func versionCommand() {
 
 func startCommand() {
 	fs := flag.NewFlagSet("start", flag.ExitOnError)
-	configFile := fs.String("config", "", "path to config file")
+	
+	// File and mode options
+	configFile := fs.String("config", "", "path to config file (optional, will auto-search if not specified)")
 	daemonMode := fs.Bool("daemon", false, "run as daemon")
-	logLevel := fs.String("log-level", "", "log level")
-	inputType := fs.String("input-type", "", "override input type")
+	
+	// Core configuration overrides
+	deviceID := fs.String("device-id", "", "device ID (overrides config file)")
+	deviceSecret := fs.String("device-secret", "", "device secret (overrides config file)")
+	apiURL := fs.String("api-url", "", "API server URL (overrides config file)")
+	
+	// Input configuration overrides
+	inputType := fs.String("input-type", "", "input type: v4l2, rtsp, file, test (overrides config file)")
+	inputSource := fs.String("input-source", "", "input source path or URL (overrides config file)")
+	
+	// MediaMTX configuration
+	mediamtxURL := fs.String("mediamtx-url", "", "MediaMTX server URL (overrides config file)")
+	
+	// Other options
+	logLevel := fs.String("log-level", "", "log level: debug, info, warn, error")
+	
 	fs.Parse(os.Args[2:])
 
+	// Auto-search for config file if not specified
 	if *configFile == "" {
-		fmt.Fprintf(os.Stderr, "Error: --config is required\n")
-		fs.Usage()
-		os.Exit(1)
+		*configFile = config.FindConfigFile()
+		if *configFile != "" {
+			fmt.Printf("📄 Found configuration file: %s\n", *configFile)
+		}
+	}
+
+	// Check if config file exists
+	if *configFile == "" {
+		fmt.Println("⚙️  No configuration file found")
+		fmt.Println("🌐 Starting setup wizard...")
+		fmt.Println()
+		runSetupWizard()
+		return
 	}
 
 	// Get absolute paths for daemon
@@ -144,8 +197,30 @@ func startCommand() {
 		*configFile = absConfigFile
 	}
 
+	// Prepare config overrides
+	overrides := &configOverrides{
+		deviceID:     *deviceID,
+		deviceSecret: *deviceSecret,
+		apiURL:       *apiURL,
+		inputType:    *inputType,
+		inputSource:  *inputSource,
+		mediamtxURL:  *mediamtxURL,
+		logLevel:     *logLevel,
+	}
+
 	// Run the client
-	runClient(*configFile, *logLevel, *inputType)
+	runClientWithOverrides(*configFile, overrides)
+}
+
+// configOverrides holds command-line configuration overrides
+type configOverrides struct {
+	deviceID     string
+	deviceSecret string
+	apiURL       string
+	inputType    string
+	inputSource  string
+	mediamtxURL  string
+	logLevel     string
 }
 
 func stopCommand() {
@@ -234,7 +309,7 @@ func isRunning(pidFile string) bool {
 	return err == nil
 }
 
-func runClient(configFile, logLevel, inputType string) {
+func runClientWithOverrides(configFile string, overrides *configOverrides) {
 	// Load configuration
 	cfg, err := config.Load(configFile)
 	if err != nil {
@@ -242,14 +317,45 @@ func runClient(configFile, logLevel, inputType string) {
 		os.Exit(1)
 	}
 
-	// Override log level if specified
-	if logLevel != "" {
-		cfg.Log.Level = logLevel
+	// Apply command-line overrides (highest priority)
+	if overrides.deviceID != "" {
+		cfg.Device.ID = overrides.deviceID
+		fmt.Printf("🔧 Override: device.id = %s\n", overrides.deviceID)
+	}
+	if overrides.deviceSecret != "" {
+		cfg.Device.Secret = overrides.deviceSecret
+		fmt.Printf("🔧 Override: device.secret = ***\n")
+	}
+	if overrides.apiURL != "" {
+		cfg.API.URL = overrides.apiURL
+		fmt.Printf("🔧 Override: api.url = %s\n", overrides.apiURL)
+	}
+	if overrides.inputType != "" {
+		cfg.Input.Type = overrides.inputType
+		fmt.Printf("🔧 Override: input.type = %s\n", overrides.inputType)
+	}
+	if overrides.inputSource != "" {
+		cfg.Input.Source = overrides.inputSource
+		fmt.Printf("🔧 Override: input.source = %s\n", overrides.inputSource)
+	}
+	if overrides.mediamtxURL != "" {
+		cfg.Stream.URL = overrides.mediamtxURL
+		fmt.Printf("🔧 Override: mediamtx.url = %s\n", overrides.mediamtxURL)
+	}
+	if overrides.logLevel != "" {
+		cfg.Log.Level = overrides.logLevel
+		fmt.Printf("🔧 Override: log.level = %s\n", overrides.logLevel)
 	}
 
-	// Override input type if specified
-	if inputType != "" {
-		cfg.Input.Type = inputType
+	// Check configuration completeness (after applying overrides)
+	if !cfg.IsComplete() {
+		missing := cfg.MissingFields()
+		fmt.Fprintf(os.Stderr, "❌ Configuration is incomplete\n")
+		fmt.Fprintf(os.Stderr, "Missing required fields: %v\n", missing)
+		fmt.Fprintf(os.Stderr, "\n")
+		fmt.Fprintf(os.Stderr, "Please run without --config to use setup wizard,\n")
+		fmt.Fprintf(os.Stderr, "or provide missing fields via command-line arguments.\n")
+		os.Exit(1)
 	}
 
 	// Initialize logger
@@ -534,4 +640,189 @@ func initLogger(cfg config.LogConfig) {
 			TimeFormat: time.RFC3339,
 		})
 	}
+}
+
+// runSetupWizard runs the setup wizard mode
+func runSetupWizard() {
+	fmt.Println("┌─────────────────────────────────────────┐")
+	fmt.Println("│  🐾 PawStream Edge Client Setup Wizard │")
+	fmt.Println("└─────────────────────────────────────────┘")
+	fmt.Println()
+	fmt.Println("Welcome! Let's set up your edge client.")
+	fmt.Println()
+
+	// Default config file location
+	defaultConfigPath := "./config.yaml"
+
+	fmt.Printf("Configuration will be saved to: %s\n", defaultConfigPath)
+	fmt.Println()
+
+	// Start Web UI for setup
+	fmt.Println("🌐 Starting Web UI setup wizard...")
+	fmt.Println()
+
+	// Initialize basic logger for setup wizard
+	log.Logger = log.Output(zerolog.ConsoleWriter{
+		Out:        os.Stdout,
+		TimeFormat: time.RFC3339,
+	})
+	zerolog.SetGlobalLevel(zerolog.InfoLevel)
+
+	// Create minimal config for Web UI only
+	setupConfig := &config.Config{
+		WebUI: &config.WebUIConfig{
+			Enabled: true,
+			Host:    "0.0.0.0",
+			Port:    8088,
+			Auth:    nil,
+		},
+		Log: config.LogConfig{
+			Level:  "info",
+			Format: "console",
+		},
+	}
+
+	// Setup graceful shutdown
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Handle signals
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+
+	go func() {
+		sig := <-sigChan
+		fmt.Printf("\n\n⚠️  Received %s signal, shutting down...\n", sig.String())
+		cancel()
+	}()
+
+	// Create SSE manager
+	sseManager := webui.NewSSEManager(log.Logger)
+	defer sseManager.Close()
+
+	// Create status function (placeholder for setup mode)
+	statusFunc := func() interface{} {
+		return map[string]interface{}{
+			"mode":   "setup",
+			"status": "waiting_for_configuration",
+		}
+	}
+
+	// Create Web UI handler with setup mode
+	webuiHandler := webui.NewHandler(defaultConfigPath, statusFunc, "", log.Logger)
+
+	// Start Web UI server
+	webuiCfg := webui.Config{
+		Host:       setupConfig.WebUI.Host,
+		Port:       setupConfig.WebUI.Port,
+		AuthConfig: nil, // No auth in setup mode
+	}
+
+	webuiServer := webui.NewServer(webuiCfg, webuiHandler, sseManager, log.Logger)
+	if err := webuiServer.Start(); err != nil {
+		fmt.Fprintf(os.Stderr, "❌ Failed to start Web UI: %v\n", err)
+		os.Exit(1)
+	}
+	defer webuiServer.Stop()
+
+	fmt.Println("✅ Web UI started successfully!")
+	fmt.Println()
+	fmt.Printf("🔗 Open in browser: \033[1;36mhttp://localhost:%d/setup\033[0m\n", setupConfig.WebUI.Port)
+	fmt.Println()
+	fmt.Println("📋 Setup steps:")
+	fmt.Println("   1. Connect to API server")
+	fmt.Println("   2. Login and select device")
+	fmt.Println("   3. Configure input source")
+	fmt.Println("   4. Save configuration and start")
+	fmt.Println()
+	fmt.Println("💡 Tip: Configuration will be saved automatically")
+	fmt.Println("        You can edit it later in the Web UI")
+	fmt.Println()
+
+	// Try to open browser automatically
+	openBrowser(fmt.Sprintf("http://localhost:%d/setup", setupConfig.WebUI.Port))
+
+	// Wait for configuration to be completed
+	fmt.Println("⏳ Waiting for configuration...")
+	fmt.Println("   (Press Ctrl+C to exit)")
+	fmt.Println()
+
+	// Watch for config file creation
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			// Check if config file was created
+			if _, err := os.Stat(defaultConfigPath); err == nil {
+				// Config file exists, check if complete
+				cfg, err := config.Load(defaultConfigPath)
+				if err != nil {
+					continue
+				}
+
+				if cfg.IsComplete() {
+					fmt.Println()
+					fmt.Println("✅ Configuration completed!")
+					fmt.Println()
+					fmt.Print("🚀 Start streaming now? [Y/n]: ")
+
+					var response string
+					fmt.Scanln(&response)
+
+					if response == "" || response == "Y" || response == "y" {
+						fmt.Println()
+						fmt.Println("Starting edge client...")
+						fmt.Println()
+
+						// Stop Web UI
+						webuiServer.Stop()
+						sseManager.Close()
+
+						// Run client with new config
+						runClientWithOverrides(defaultConfigPath, &configOverrides{})
+						return
+					} else {
+						fmt.Println()
+						fmt.Println("✅ Configuration saved!")
+						fmt.Printf("💡 Run \033[1;36m./edge-client start\033[0m to start streaming\n")
+						fmt.Println()
+						return
+					}
+				}
+			}
+
+		case <-ctx.Done():
+			fmt.Println()
+			fmt.Println("Setup wizard cancelled.")
+			return
+		}
+	}
+}
+
+// openBrowser attempts to open the default browser
+func openBrowser(url string) {
+	var cmd string
+	var args []string
+
+	switch runtime := os.Getenv("GOOS"); runtime {
+	case "linux":
+		cmd = "xdg-open"
+		args = []string{url}
+	case "darwin":
+		cmd = "open"
+		args = []string{url}
+	case "windows":
+		cmd = "cmd"
+		args = []string{"/c", "start", url}
+	default:
+		// Can't open browser, just return
+		return
+	}
+
+	// Try to open browser (non-blocking, ignore errors)
+	go func() {
+		exec.Command(cmd, args...).Start()
+	}()
 }
