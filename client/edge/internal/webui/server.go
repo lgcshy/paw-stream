@@ -86,6 +86,7 @@ func NewServer(cfg Config, handler *Handler, sseManager *SSEManager, logger zero
 func (s *Server) setupRoutes() {
 	// Static files (embedded)
 	s.app.Get("/", serveIndex)
+	s.app.Get("/setup", serveSetup)
 	s.app.Static("/", "./web", fiber.Static{
 		Compress:      true,
 		ByteRange:     true,
@@ -177,6 +178,11 @@ func (s *Server) Stop() error {
 // serveIndex serves the index.html file
 func serveIndex(c *fiber.Ctx) error {
 	return c.SendFile("./web/index.html")
+}
+
+// serveSetup serves the setup wizard page
+func serveSetup(c *fiber.Ctx) error {
+	return c.SendFile("./web/setup.html")
 }
 
 // errorHandler handles fiber errors

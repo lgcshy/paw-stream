@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PawStream 设置向导</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .setup-container {
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 2rem;
+        }
+
+        .setup-header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .setup-header h1 {
+            color: var(--primary-color);
+            margin-bottom: 0.5rem;
+        }
+
+        .setup-header p {
+            color: var(--text-secondary);
+        }
+
+        .steps-indicator {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 3rem;
+            position: relative;
+        }
+
+        .steps-indicator::before {
+            content: '';
+            position: absolute;
+            top: 20px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: var(--border-color);
+            z-index: -1;
+        }
+
+        .step-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: var(--bg-color);
+            padding: 0 10px;
+            position: relative;
+        }
+
+        .step-number {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--border-color);
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+
+        .step-item.active .step-number {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .step-item.completed .step-number {
+            background: var(--success-color);
+            color: white;
+        }
+
+        .step-label {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            text-align: center;
+        }
+
+        .step-item.active .step-label {
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        .step-content {
+            display: none;
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        .step-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 1rem;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+
+        .form-group small {
+            display: block;
+            margin-top: 0.25rem;
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        .alert {
+            padding: 1rem;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+        }
+
+        .alert-success {
+            background: rgba(76, 175, 80, 0.1);
+            border: 1px solid var(--success-color);
+            color: var(--success-color);
+        }
+
+        .alert-error {
+            background: rgba(244, 67, 54, 0.1);
+            border: 1px solid var(--error-color);
+            color: var(--error-color);
+        }
+
+        .alert-info {
+            background: rgba(33, 150, 243, 0.1);
+            border: 1px solid #2196F3;
+            color: #2196F3;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 1rem;
+            justify-content: flex-end;
+            margin-top: 2rem;
+        }
+
+        .btn {
+            padding: 0.75rem 2rem;
+            border: none;
+            border-radius: 4px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            opacity: 0.9;
+        }
+
+        .btn-primary:disabled {
+            background: var(--border-color);
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            background: var(--border-color);
+            color: var(--text-primary);
+        }
+
+        .btn-secondary:hover {
+            background: var(--text-secondary);
+            color: white;
+        }
+
+        .device-list {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            margin-bottom: 1rem;
+        }
+
+        .device-item {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        .device-item:hover {
+            background: rgba(0, 0, 0, 0.05);
+        }
+
+        .device-item.selected {
+            background: rgba(76, 175, 80, 0.1);
+            border-left: 3px solid var(--success-color);
+        }
+
+        .device-item:last-child {
+            border-bottom: none;
+        }
+
+        .device-name {
+            font-weight: 500;
+            margin-bottom: 0.25rem;
+        }
+
+        .device-info {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .source-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .source-card {
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .source-card:hover {
+            border-color: var(--primary-color);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .source-card.selected {
+            border-color: var(--success-color);
+            background: rgba(76, 175, 80, 0.05);
+        }
+
+        .source-type {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+        }
+
+        .source-type.v4l2 {
+            background: #2196F3;
+            color: white;
+        }
+
+        .source-type.rtsp {
+            background: #9C27B0;
+            color: white;
+        }
+
+        .source-type.testsrc {
+            background: #FF9800;
+            color: white;
+        }
+
+        .source-name {
+            font-weight: 500;
+            margin-bottom: 0.25rem;
+        }
+
+        .source-device {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            font-family: monospace;
+        }
+
+        .config-summary {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1.5rem;
+        }
+
+        .config-summary h3 {
+            margin-bottom: 1rem;
+            color: var(--primary-color);
+        }
+
+        .config-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .config-item:last-child {
+            border-bottom: none;
+        }
+
+        .config-label {
+            font-weight: 500;
+        }
+
+        .config-value {
+            color: var(--text-secondary);
+            font-family: monospace;
+            font-size: 0.875rem;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="setup-container">
+        <div class="setup-header">
+            <h1>🐾 PawStream 设置向导</h1>
+            <p>让我们一起完成初始配置</p>
+        </div>
+
+        <!-- 步骤指示器 -->
+        <div class="steps-indicator">
+            <div class="step-item active" data-step="1">
+                <div class="step-number">1</div>
+                <div class="step-label">API 服务器</div>
+            </div>
+            <div class="step-item" data-step="2">
+                <div class="step-number">2</div>
+                <div class="step-label">用户登录</div>
+            </div>
+            <div class="step-item" data-step="3">
+                <div class="step-number">3</div>
+                <div class="step-label">选择设备</div>
+            </div>
+            <div class="step-item" data-step="4">
+                <div class="step-number">4</div>
+                <div class="step-label">输入源</div>
+            </div>
+            <div class="step-item" data-step="5">
+                <div class="step-number">5</div>
+                <div class="step-label">完成</div>
+            </div>
+        </div>
+
+        <!-- 步骤 1: API 服务器配置 -->
+        <div class="step-content active" id="step-1">
+            <h2>配置 API 服务器</h2>
+            <div id="step1-alert"></div>
+            
+            <div class="form-group">
+                <label for="api-url">API 服务器地址</label>
+                <input type="url" id="api-url" placeholder="http://192.168.1.100:8080" required>
+                <small>输入 PawStream API 服务器的地址</small>
+            </div>
+
+            <div class="button-group">
+                <button class="btn btn-primary" onclick="validateServer()" id="btn-validate">
+                    验证连接
+                </button>
+            </div>
+        </div>
+
+        <!-- 步骤 2: 用户登录 -->
+        <div class="step-content" id="step-2">
+            <h2>登录到 API 服务器</h2>
+            <div id="step2-alert"></div>
+            
+            <div class="form-group">
+                <label for="username">用户名</label>
+                <input type="text" id="username" required autocomplete="username">
+            </div>
+
+            <div class="form-group">
+                <label for="password">密码</label>
+                <input type="password" id="password" required autocomplete="current-password">
+            </div>
+
+            <div class="button-group">
+                <button class="btn btn-secondary" onclick="prevStep()">上一步</button>
+                <button class="btn btn-primary" onclick="login()" id="btn-login">
+                    登录
+                </button>
+            </div>
+        </div>
+
+        <!-- 步骤 3: 设备选择 -->
+        <div class="step-content" id="step-3">
+            <h2>选择或创建设备</h2>
+            <div id="step3-alert"></div>
+            
+            <div id="device-list-container" class="hidden">
+                <h3>现有设备</h3>
+                <div class="device-list" id="device-list"></div>
+            </div>
+
+            <h3>创建新设备</h3>
+            <div class="form-group">
+                <label for="device-name">设备名称</label>
+                <input type="text" id="device-name" placeholder="例如: 客厅摄像头">
+            </div>
+
+            <div class="form-group">
+                <label for="device-location">位置（可选）</label>
+                <input type="text" id="device-location" placeholder="例如: 一楼客厅">
+            </div>
+
+            <div class="button-group">
+                <button class="btn btn-secondary" onclick="prevStep()">上一步</button>
+                <button class="btn btn-primary" onclick="selectOrCreateDevice()" id="btn-device">
+                    下一步
+                </button>
+            </div>
+        </div>
+
+        <!-- 步骤 4: 输入源配置 -->
+        <div class="step-content" id="step-4">
+            <h2>选择输入源</h2>
+            <div id="step4-alert"></div>
+            
+            <button class="btn btn-secondary" onclick="detectSources()" style="margin-bottom: 1rem;">
+                🔍 检测输入源
+            </button>
+
+            <div class="source-list" id="source-list"></div>
+
+            <div id="custom-source-container" class="hidden" style="margin-top: 1.5rem;">
+                <h3>或输入自定义源</h3>
+                <div class="form-group">
+                    <label for="custom-source-type">类型</label>
+                    <select id="custom-source-type">
+                        <option value="v4l2">V4L2 设备</option>
+                        <option value="rtsp">RTSP 流</option>
+                        <option value="file">视频文件</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="custom-source">源路径/URL</label>
+                    <input type="text" id="custom-source" placeholder="/dev/video0 或 rtsp://...">
+                </div>
+            </div>
+
+            <div class="button-group">
+                <button class="btn btn-secondary" onclick="prevStep()">上一步</button>
+                <button class="btn btn-primary" onclick="saveAndFinish()" id="btn-finish">
+                    完成配置
+                </button>
+            </div>
+        </div>
+
+        <!-- 步骤 5: 完成 -->
+        <div class="step-content" id="step-5">
+            <h2>✅ 配置完成</h2>
+            <div id="step5-alert"></div>
+            
+            <div class="config-summary">
+                <h3>配置摘要</h3>
+                <div class="config-item">
+                    <span class="config-label">API 服务器:</span>
+                    <span class="config-value" id="summary-api-url"></span>
+                </div>
+                <div class="config-item">
+                    <span class="config-label">设备 ID:</span>
+                    <span class="config-value" id="summary-device-id"></span>
+                </div>
+                <div class="config-item">
+                    <span class="config-label">设备名称:</span>
+                    <span class="config-value" id="summary-device-name"></span>
+                </div>
+                <div class="config-item">
+                    <span class="config-label">输入类型:</span>
+                    <span class="config-value" id="summary-input-type"></span>
+                </div>
+                <div class="config-item">
+                    <span class="config-label">输入源:</span>
+                    <span class="config-value" id="summary-input-source"></span>
+                </div>
+                <div class="config-item">
+                    <span class="config-label">配置文件:</span>
+                    <span class="config-value" id="summary-config-path"></span>
+                </div>
+            </div>
+
+            <div class="alert alert-success" style="margin-top: 1.5rem;">
+                <strong>🎉 配置已保存！</strong><br>
+                配置文件已成功创建。您现在可以关闭此页面，客户端将自动开始推流。
+            </div>
+
+            <div class="button-group">
+                <button class="btn btn-primary" onclick="window.close()">
+                    关闭页面
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="setup.js"></script>
+</body>
+</html>
