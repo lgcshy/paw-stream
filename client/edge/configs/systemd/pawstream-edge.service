@@ -1,0 +1,29 @@
+[Unit]
+Description=PawStream Edge Client
+Documentation=https://github.com/lgc/pawstream
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pawstream
+Group=pawstream
+WorkingDirectory=/opt/pawstream/edge
+ExecStart=/usr/local/bin/edge-client --config /etc/pawstream/config.yaml
+Restart=on-failure
+RestartSec=5s
+StandardOutput=journal
+StandardError=journal
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/log/pawstream /var/lib/pawstream
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+
+[Install]
+WantedBy=multi-user.target

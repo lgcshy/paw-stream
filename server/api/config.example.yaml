@@ -1,0 +1,42 @@
+# PawStream API Server Configuration Example
+
+server:
+  host: "0.0.0.0"
+  port: "3000"
+  mode: "development"  # development or production
+
+log:
+  level: "info"        # debug, info, warn, error
+  file: "logs/api.log"
+  console: true
+  max_size: 100        # MB
+  max_backups: 3
+  max_age: 7           # days
+  compress: true
+
+db:
+  path: "data/pawstream.db"
+  max_open_conns: 25
+  max_idle_conns: 5
+  conn_max_lifetime: 300s
+
+jwt:
+  secret: "your-secret-key-change-me-in-production"
+  expiry: 24h
+
+mediamtx:
+  # Internal MediaMTX API URL (for server-side communication)
+  url: "http://localhost:8554"
+  
+  # MediaMTX WebRTC URL (for client WebRTC connections)
+  # This should be the public/accessible URL for clients
+  # Examples:
+  #   - Development: http://localhost:8889
+  #   - Production: https://stream.yourdomain.com:8889
+  webrtc_url: "http://localhost:8889"
+  
+  # MediaMTX RTSP URL (for client RTSP connections, if needed)
+  # Examples:
+  #   - Development: rtsp://localhost:8554
+  #   - Production: rtsp://stream.yourdomain.com:8554
+  rtsp_url: "rtsp://localhost:8554"

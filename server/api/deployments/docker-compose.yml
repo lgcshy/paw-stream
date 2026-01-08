@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile
+    container_name: pawstream-api
+    ports:
+      - "3000:3000"
+    environment:
+      - PAWSTREAM_SERVER_MODE=production
+      - PAWSTREAM_LOG_LEVEL=info
+      - PAWSTREAM_DB_PATH=/app/data/pawstream.db
+      - PAWSTREAM_JWT_SECRET=${JWT_SECRET:-change-me-in-production}
+      - PAWSTREAM_MEDIAMTX_URL=http://mediamtx:8554
+    volumes:
+      - api-data:/app/data
+      - api-logs:/app/logs
+    restart: unless-stopped
+    networks:
+      - pawstream
+
+  mediamtx:
+    image: bluenviron/mediamtx:latest
+    container_name: pawstream-mediamtx
+    ports:
+      - "8554:8554"     # RTSP
+      - "1935:1935"     # RTMP
+      - "8888:8888"     # HLS
+      - "8889:8889"     # WebRTC
+    volumes:
+      - ./mediamtx.yml:/mediamtx.yml
+    restart: unless-stopped
+    networks:
+      - pawstream
+    depends_on:
+      - api
+
+volumes:
+  api-data:
+  api-logs:
+
+networks:
+  pawstream:
+    driver: bridge

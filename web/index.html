@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PawStream - 宠物实时监控</title>
+    
+    <!-- Theme Pre-loader: Apply theme before Vue app loads to prevent white flash -->
+    <script>
+      (function() {
+        // Get theme from localStorage
+        var savedMode = localStorage.getItem('theme_mode');
+        var mode = savedMode || 'auto';
+        
+        // Determine effective theme
+        var theme = 'light';
+        if (mode === 'dark') {
+          theme = 'dark';
+        } else if (mode === 'auto') {
+          // Check system preference
+          if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            theme = 'dark';
+          }
+        }
+        
+        // Apply theme class immediately
+        if (theme === 'dark') {
+          document.documentElement.classList.add('dark-theme');
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,69 @@
+# PawStream Edge Client Configuration Example
+
+# ==================== 设备信息 ====================
+# 从 PawStream Web UI 获取设备 ID 和密钥
+device:
+  id: "your-device-id-here"
+  secret: "your-device-secret-here"
+
+# ==================== API 服务器 ====================
+api:
+  url: "http://localhost:8080"  # PawStream API 服务器地址
+  timeout: 10s                   # API 请求超时时间
+
+# ==================== 视频输入源 ====================
+input:
+  # 输入类型: v4l2 | rtsp | file | test
+  type: "v4l2"
+  
+  # 输入源（根据 type 不同，格式不同）:
+  # - v4l2: "/dev/video0" (Linux 摄像头设备)
+  # - rtsp: "rtsp://192.168.1.100:554/stream" (IP 摄像头)
+  # - file: "/path/to/video.mp4" (视频文件，循环播放)
+  # - test: "" (生成测试画面)
+  source: "/dev/video0"
+
+# ==================== 视频编码参数 ====================
+video:
+  codec: "h264"        # 视频编码格式
+  width: 1280          # 视频宽度
+  height: 720          # 视频高度
+  framerate: 30        # 帧率
+  bitrate: 2000000     # 比特率 (bps)，2000000 = 2 Mbps
+
+# ==================== 推流配置 ====================
+stream:
+  # MediaMTX URL（留空将从 API 自动获取）
+  url: ""
+  
+  # 推流中断后的重连间隔
+  reconnect_interval: 5s
+  
+  # 最大重连次数（0 = 无限重试，-1 = 不重连）
+  max_reconnect_attempts: 0
+
+# ==================== 日志配置 ====================
+log:
+  # 日志级别: debug | info | warn | error
+  level: "info"
+  
+  # 日志文件路径（留空输出到 stdout）
+  file: ""
+  
+  # 日志格式: json | console
+  format: "json"
+
+# ==================== 健康检查 ====================
+# 可选的 HTTP 健康检查端点，用于监控客户端状态
+health:
+  enabled: false
+  address: ":9090"  # 监听地址，如 ":9090" 或 "0.0.0.0:9090"
+
+# ==================== 高级选项 ====================
+# 通常不需要修改
+
+# 优雅关闭超时
+shutdown_timeout: 10s
+
+# 启动时是否验证输入源（可能会增加启动时间）
+validate_input_on_start: true

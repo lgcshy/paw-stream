@@ -1,0 +1,26 @@
+server:
+  port: "3000"
+  host: "0.0.0.0"
+  mode: "development"  # or "production"
+
+log:
+  level: "info"              # debug, info, warn, error
+  file: "logs/api.log"       # log file path
+  console: true              # enable console output
+  max_size: 100              # max size in MB per file
+  max_backups: 7             # max number of old log files
+  max_age: 30                # max age in days
+  compress: true             # compress old log files
+
+db:
+  path: "data/pawstream.db"  # SQLite database file path
+  max_open_conns: 10
+  max_idle_conns: 5
+  conn_max_lifetime: "1h"
+
+jwt:
+  secret: "change-me-in-production"
+  expiry: "24h"
+
+mediamtx:
+  url: "http://localhost:8554"

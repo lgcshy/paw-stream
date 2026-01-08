@@ -1,0 +1,38 @@
+# Test configuration for edge-client
+# Use this with: ./build/edge-client --config config.test.yaml
+
+device:
+  id: "test-device-id"
+  secret: "test-secret"
+
+api:
+  url: "http://localhost:8080"
+  timeout: 10s
+
+input:
+  type: "test"  # Use test mode to generate test video
+  source: ""    # Not needed for test mode
+
+video:
+  codec: "libx264"
+  width: 1280
+  height: 720
+  framerate: 30
+  bitrate: 2000000
+
+stream:
+  url: "localhost:8554"
+  reconnect_interval: 5s
+  max_reconnect_attempts: 0
+
+log:
+  level: "debug"
+  file: ""
+  format: "console"
+
+health:
+  enabled: true
+  address: ":9090"
+
+shutdown_timeout: 10s
+validate_input_on_start: false

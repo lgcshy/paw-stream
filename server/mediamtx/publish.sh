@@ -1,0 +1,1 @@
+ffmpeg -re -stream_loop -1 -i 18800379-uhd_3840_2160_30fps.mp4 -c copy -f rtsp rtsp://localhost:8554/mystream

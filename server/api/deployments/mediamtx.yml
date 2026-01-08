@@ -1,0 +1,37 @@
+# MediaMTX configuration with API auth callback
+
+# HTTP auth callback to PawStream API
+externalAuthenticationURL: http://api:3000/mediamtx/auth
+
+# RTSP server
+rtsp: yes
+rtspAddress: :8554
+
+# RTMP server
+rtmp: yes
+rtmpAddress: :1935
+
+# HLS server
+hls: yes
+hlsAddress: :8888
+hlsAllowOrigin: '*'
+
+# WebRTC server
+webrtc: yes
+webrtcAddress: :8889
+
+# Logging
+logLevel: info
+logDestinations: [stdout]
+
+# Paths configuration
+paths:
+  # All paths use external auth
+  all:
+    # Publish requires auth (device secret)
+    publishUser: optional
+    publishPass: optional
+    
+    # Read requires auth (user token)
+    readUser: optional
+    readPass: optional

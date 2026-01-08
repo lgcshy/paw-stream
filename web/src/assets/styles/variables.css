@@ -1,0 +1,294 @@
+/* Theme CSS Variables */
+
+/* ==================== Light Theme (Default) ==================== */
+:root {
+  /* Background Colors */
+  --bg-primary: #f7f8fa;
+  --bg-secondary: #ffffff;
+  --bg-card: #ffffff;
+  --bg-elevated: #ffffff;
+  
+  /* Text Colors */
+  --text-primary: #323233;
+  --text-secondary: #646566;
+  --text-disabled: #c8c9cc;
+  --text-link: #1989fa;
+  
+  /* Border Colors */
+  --border-color: #ebedf0;
+  --border-light: #f7f8fa;
+  
+  /* Component Colors */
+  --navbar-bg: #ffffff;
+  --navbar-text: #323233;
+  --tabbar-bg: #ffffff;
+  --tabbar-text: #646566;
+  --tabbar-active: #1989fa;
+  
+  /* Brand Colors */
+  --primary-color: #1989fa;
+  --success-color: #07c160;
+  --warning-color: #ff976a;
+  --danger-color: #ee0a24;
+  
+  /* Shadow */
+  --shadow-light: rgba(0, 0, 0, 0.04);
+  --shadow-medium: rgba(0, 0, 0, 0.08);
+  --shadow-heavy: rgba(0, 0, 0, 0.12);
+  
+  /* Gradient Backgrounds */
+  --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --gradient-card: linear-gradient(135deg, #f7f8fa 0%, #ffffff 100%);
+  
+  /* Overlay */
+  --overlay-bg: rgba(0, 0, 0, 0.7);
+}
+
+/* ==================== Dark Theme ==================== */
+.dark-theme {
+  /* Background Colors */
+  --bg-primary: #1a1a1a;
+  --bg-secondary: #2c2c2c;
+  --bg-card: #2c2c2c;
+  --bg-elevated: #3a3a3a;
+  
+  /* Text Colors */
+  --text-primary: #e5e5e5;
+  --text-secondary: #b0b0b0;
+  --text-disabled: #666666;
+  --text-link: #4da6ff;
+  
+  /* Border Colors */
+  --border-color: #404040;
+  --border-light: #333333;
+  
+  /* Component Colors */
+  --navbar-bg: #2c2c2c;
+  --navbar-text: #e5e5e5;
+  --tabbar-bg: #2c2c2c;
+  --tabbar-text: #b0b0b0;
+  --tabbar-active: #6B9DD8;
+  
+  /* Brand Colors (slightly adjusted for dark theme) */
+  --primary-color: #4da6ff;
+  --success-color: #52c41a;
+  --warning-color: #fa8c16;
+  --danger-color: #f5222d;
+  
+  /* Shadow (darker for dark theme) */
+  --shadow-light: rgba(0, 0, 0, 0.2);
+  --shadow-medium: rgba(0, 0, 0, 0.3);
+  --shadow-heavy: rgba(0, 0, 0, 0.4);
+  
+  /* Gradient Backgrounds (darker versions) */
+  --gradient-primary: linear-gradient(135deg, #4a5d8f 0%, #5a3d74 100%);
+  --gradient-card: linear-gradient(135deg, #2c2c2c 0%, #3a3a3a 100%);
+  
+  /* Overlay */
+  --overlay-bg: rgba(0, 0, 0, 0.85);
+}
+
+/* ==================== Note ==================== */
+/* Vant theme is managed by ConfigProvider + global CSS overrides */
+
+/* ==================== Global Styles ==================== */
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+#app {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  min-height: 100vh;
+}
+
+/* Smooth transitions for theme switching - 但排除某些组件 */
+*:not(.van-toast):not(.van-toast *):not(.van-dialog):not(.van-dialog *) {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+/* ==================== Dark Theme Overrides for Vant Components ==================== */
+
+/* Toast Styles - 只改颜色，确保不影响布局 */
+.dark-theme .van-toast {
+  background-color: rgba(40, 40, 40, 0.95) !important;
+}
+
+.dark-theme .van-toast,
+.dark-theme .van-toast .van-toast__text {
+  color: #e5e5e5 !important;
+}
+
+.dark-theme .van-toast .van-icon {
+  color: #e5e5e5 !important;
+}
+
+/* 确保 success 和 fail toast 的图标颜色正确 */
+.dark-theme .van-toast--success .van-icon,
+.dark-theme .van-toast--fail .van-icon {
+  color: inherit !important;
+}
+
+/* Dialog Styles */
+.dark-theme .van-dialog {
+  background-color: #2c2c2c !important;
+}
+
+.dark-theme .van-dialog__header {
+  color: #e5e5e5 !important;
+}
+
+.dark-theme .van-dialog__message {
+  color: #b0b0b0 !important;
+}
+
+/* Dialog按钮 - 使用更强的选择器确保生效 */
+.dark-theme .van-dialog__confirm,
+.dark-theme .van-dialog__footer .van-button--primary,
+.dark-theme .van-dialog__footer .van-button--primary .van-button__text,
+.dark-theme .van-dialog__confirm .van-button__text {
+  color: #42A5F5 !important;  /* 适中的蓝色，既清晰又不扎眼 */
+  font-weight: 600 !important;  /* 加粗以提高可见性 */
+  background-color: transparent !important;  /* 移除白色背景 */
+}
+
+/* 确保按钮容器也是透明背景 */
+.dark-theme .van-dialog__confirm.van-button,
+.dark-theme .van-dialog__footer .van-button--primary.van-button {
+  background-color: transparent !important;
+  border: none !important;
+}
+
+/* 按钮激活状态 */
+.dark-theme .van-dialog__confirm:active,
+.dark-theme .van-dialog__footer .van-button--primary:active {
+  background-color: rgba(66, 165, 245, 0.1) !important;  /* 按下时稍微有点反馈 */
+}
+
+.dark-theme .van-dialog__cancel,
+.dark-theme .van-dialog__footer .van-button--default,
+.dark-theme .van-dialog__footer .van-button--default .van-button__text,
+.dark-theme .van-dialog__cancel .van-button__text {
+  color: #aaaaaa !important;  /* 稍微提亮，更清晰 */
+  background-color: transparent !important;  /* 移除白色背景 */
+}
+
+/* 确保取消按钮容器也是透明背景 */
+.dark-theme .van-dialog__cancel.van-button,
+.dark-theme .van-dialog__footer .van-button--default.van-button {
+  background-color: transparent !important;
+  border: none !important;
+}
+
+/* 取消按钮激活状态 */
+.dark-theme .van-dialog__cancel:active,
+.dark-theme .van-dialog__footer .van-button--default:active {
+  background-color: rgba(255, 255, 255, 0.05) !important;  /* 按下时稍微有点反馈 */
+}
+
+.dark-theme .van-dialog__footer {
+  border-top: 1px solid #404040 !important;
+}
+
+.dark-theme .van-dialog__footer .van-hairline--top::after {
+  border-color: #404040 !important;
+}
+
+/* Login/Register Page - CellGroup Override */
+.dark-theme .login-view .van-cell-group,
+.dark-theme .register-page .van-cell-group {
+  background-color: rgba(44, 44, 44, 0.95) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important;
+}
+
+.dark-theme .login-view .van-cell,
+.dark-theme .register-page .van-cell {
+  background-color: transparent !important;
+}
+
+.dark-theme .login-view .van-field__label,
+.dark-theme .register-page .van-field__label {
+  color: #b0b0b0 !important;
+}
+
+.dark-theme .login-view .van-field__control,
+.dark-theme .register-page .van-field__control {
+  color: #e5e5e5 !important;
+}
+
+.dark-theme .login-view .van-field__control::placeholder,
+.dark-theme .register-page .van-field__control::placeholder {
+  color: #666666 !important;
+}
+
+/* ActionSheet Styles */
+.dark-theme .van-action-sheet {
+  background-color: #2c2c2c !important;
+}
+
+.dark-theme .van-action-sheet__item {
+  background-color: #2c2c2c !important;
+  color: #e5e5e5 !important;
+}
+
+.dark-theme .van-action-sheet__item:active {
+  background-color: #3a3a3a !important;
+}
+
+.dark-theme .van-action-sheet__subname {
+  color: #64B5F6 !important;
+}
+
+.dark-theme .van-action-sheet__cancel {
+  background-color: #2c2c2c !important;
+  color: #888888 !important;
+}
+
+.dark-theme .van-action-sheet__gap {
+  background-color: #1a1a1a !important;
+}
+
+/* Overlay */
+.dark-theme .van-overlay {
+  background-color: rgba(0, 0, 0, 0.75) !important;
+}
+
+/* Register Page Specific */
+.dark-theme .register-page {
+  background: linear-gradient(to bottom, #1a1a1a 0%, #2c2c2c 100%) !important;
+}
+
+.dark-theme .register-header h1 {
+  color: #64B5F6 !important;
+}
+
+.dark-theme .register-header p {
+  color: #b0b0b0 !important;
+}
+
+.dark-theme .password-strength {
+  background-color: #2c2c2c !important;
+}
+
+.dark-theme .strength-label {
+  color: #b0b0b0 !important;
+}
+
+.dark-theme .strength-bar {
+  background-color: #404040 !important;
+}
+
+.dark-theme .register-footer {
+  color: #b0b0b0 !important;
+}
+
+.dark-theme .login-link {
+  color: #64B5F6 !important;
+}
+
+.dark-theme .login-link:hover {
+  color: #90CAF9 !important;
+  border-bottom-color: #90CAF9 !important;
+}

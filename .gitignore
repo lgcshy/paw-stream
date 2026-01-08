@@ -1,0 +1,76 @@
+# PawStream Project - Root .gitignore
+
+# Build artifacts
+build/
+dist/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test binaries
+*.test
+
+# Coverage
+*.out
+coverage.html
+
+# Configuration files (except examples)
+config.yaml
+config.local.yaml
+*.local.yaml
+
+# Logs
+*.log
+logs/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+/tmp/
+
+# SQLite databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment
+.env
+.env.local
+
+# Test scripts with credentials
+*_with_auth.sh
+test_*.sh
+
+# MediaMTX runtime data
+server/mediamtx/*.db
+
+# Media files (test videos, etc.)
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.flv
+*.wmv
+*.m4v
+
+# API server data
+server/api/pawstream.db
+
+# Node modules (handled by web/.gitignore)
+node_modules/
+
+# Go workspace
+go.work
+go.work.sum
