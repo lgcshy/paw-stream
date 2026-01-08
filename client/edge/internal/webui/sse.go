@@ -9,6 +9,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/rs/zerolog"
+	"github.com/valyala/fasthttp"
 )
 
 // SSEManager manages Server-Sent Events connections
@@ -43,14 +44,13 @@ func NewSSEManager(logger zerolog.Logger) *SSEManager {
 	}
 }
 
-// Handler handles SSE connections
+// Handler handles SSE connections (based on Fiber official SSE recipe)
 func (m *SSEManager) Handler(c *fiber.Ctx) error {
 	// Set SSE headers
 	c.Set("Content-Type", "text/event-stream")
 	c.Set("Cache-Control", "no-cache")
 	c.Set("Connection", "keep-alive")
-	c.Set("X-Accel-Buffering", "no")
-	c.Status(fiber.StatusOK)
+	c.Set("Transfer-Encoding", "chunked")
 
 	// Generate client ID
 	clientID := fmt.Sprintf("%s-%d", c.IP(), time.Now().UnixNano())
@@ -62,7 +62,7 @@ func (m *SSEManager) Handler(c *fiber.Ctx) error {
 	m.mu.Lock()
 	if m.closed {
 		m.mu.Unlock()
-		return c.SendString("SSE service is shutting down\n")
+		return c.Status(fiber.StatusServiceUnavailable).SendString("SSE service is shutting down")
 	}
 	m.clients[clientID] = msgChan
 	m.mu.Unlock()
@@ -78,8 +78,11 @@ func (m *SSEManager) Handler(c *fiber.Ctx) error {
 		m.logger.Info().Str("client", clientID).Msg("SSE client disconnected")
 	}()
 
-	// This MUST block the handler to keep connection alive
-	c.Context().SetBodyStreamWriter(func(w *bufio.Writer) {
+	// Use fasthttp.StreamWriter to properly handle SSE streaming
+	// This is the KEY to make SSE work correctly in Fiber!
+	c.Status(fiber.StatusOK).Context().SetBodyStreamWriter(fasthttp.StreamWriter(func(w *bufio.Writer) {
+		m.logger.Info().Str("client", clientID).Msg("SSE stream writer started")
+
 		// Send initial connection event
 		initialEvent := SSEEvent{
 			Type: "connected",
@@ -89,17 +92,18 @@ func (m *SSEManager) Handler(c *fiber.Ctx) error {
 			},
 		}
 		if data, err := json.Marshal(initialEvent); err == nil {
-			w.WriteString(fmt.Sprintf("data: %s\n\n", string(data)))
-			w.Flush()
+			fmt.Fprintf(w, "data: %s\n\n", string(data))
+			if err := w.Flush(); err != nil {
+				m.logger.Error().Err(err).Str("client", clientID).Msg("Failed to send initial event")
+				return
+			}
 		}
 
 		// Ping ticker
 		ticker := time.NewTicker(15 * time.Second)
 		defer ticker.Stop()
 
-		m.logger.Info().Str("client", clientID).Msg("SSE event loop started")
-
-		// Event loop - this MUST run continuously
+		// Event loop - keeps connection alive
 		for {
 			select {
 			case msg, ok := <-msgChan:
@@ -108,24 +112,23 @@ func (m *SSEManager) Handler(c *fiber.Ctx) error {
 					return
 				}
 				// Send event
-				w.WriteString(fmt.Sprintf("data: %s\n\n", string(msg)))
+				fmt.Fprintf(w, "data: %s\n\n", string(msg))
 				if err := w.Flush(); err != nil {
-					m.logger.Warn().Err(err).Str("client", clientID).Msg("Failed to send event")
+					m.logger.Warn().Err(err).Str("client", clientID).Msg("Failed to send event, closing connection")
 					return
 				}
 
 			case <-ticker.C:
 				// Send keep-alive comment
-				w.WriteString(": keepalive\n\n")
+				fmt.Fprintf(w, ": keepalive\n\n")
 				if err := w.Flush(); err != nil {
-					m.logger.Warn().Err(err).Str("client", clientID).Msg("Failed to send keepalive")
+					m.logger.Warn().Err(err).Str("client", clientID).Msg("Failed to send keepalive, closing connection")
 					return
 				}
 			}
 		}
-	})
+	}))
 
-	m.logger.Info().Str("client", clientID).Msg("Handler returning")
 	return nil
 }
 
