@@ -84,16 +84,14 @@ func (g *GStreamerEngine) buildV4L2Input() ([]string, error) {
 
 // buildRTSPInput builds pipeline for RTSP stream input
 func (g *GStreamerEngine) buildRTSPInput() ([]string, error) {
-	source := g.input.String()
-	// Extract RTSP URL from source
-	url := strings.TrimPrefix(source, "rtsp://")
-	if url == "" {
-		return nil, fmt.Errorf("invalid RTSP URL")
+	// Get RTSP URL from RTSP source
+	rtspSrc, ok := g.input.(*capture.RTSPSource)
+	if !ok {
+		return nil, fmt.Errorf("input is not an RTSP source")
 	}
-	url = "rtsp://" + url
 
 	return []string{
-		fmt.Sprintf("rtspsrc location=%s latency=%d", url, g.config.LatencyMs),
+		fmt.Sprintf("rtspsrc location=%s latency=%d", rtspSrc.URL, g.config.LatencyMs),
 		"rtph264depay",
 		"h264parse",
 		"avdec_h264",
