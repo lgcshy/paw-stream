@@ -201,55 +201,12 @@ func (g *GStreamerEngine) buildSoftwareEncoder() ([]string, error) {
 }
 
 // buildOutputElements builds pipeline elements for RTSP output
-// Note: GStreamer 1.0 doesn't have rtspclientsink by default
-// We use flvmux + rtmpsink to push to MediaMTX via RTMP, which it converts to RTSP
 func (g *GStreamerEngine) buildOutputElements() []string {
-	// Convert RTSP URL to RTMP URL for MediaMTX
-	// rtsp://user:pass@host:8554/path -> rtmp://host:1935/path?user=user&pass=pass
-	rtmpURL := convertRTSPtoRTMP(g.output)
-	
 	return []string{
-		"flvmux streamable=true",
-		fmt.Sprintf("rtmpsink location=%s", rtmpURL),
+		"rtph264pay config-interval=1 pt=96",
+		fmt.Sprintf("rtspclientsink location=%s latency=%d",
+			g.output, g.config.LatencyMs),
 	}
-}
-
-// convertRTSPtoRTMP converts RTSP URL to RTMP URL for MediaMTX
-func convertRTSPtoRTMP(rtspURL string) string {
-	// Parse rtsp://user:pass@host:port/path
-	url := strings.TrimPrefix(rtspURL, "rtsp://")
-	
-	var auth, hostPort, path string
-	// Split auth and host
-	if idx := strings.Index(url, "@"); idx >= 0 {
-		auth = url[:idx]
-		url = url[idx+1:]
-	}
-	
-	// Split host and path
-	if idx := strings.Index(url, "/"); idx >= 0 {
-		hostPort = url[:idx]
-		path = url[idx+1:]
-	} else {
-		hostPort = url
-		path = ""
-	}
-	
-	// Remove :8554 if present, MediaMTX RTMP is on 1935
-	host := strings.Split(hostPort, ":")[0]
-	
-	// Build RTMP URL
-	rtmpURL := fmt.Sprintf("rtmp://%s:1935/%s", host, path)
-	
-	// Add auth as query parameters if present
-	if auth != "" {
-		parts := strings.Split(auth, ":")
-		if len(parts) == 2 {
-			rtmpURL += fmt.Sprintf("?user=%s&pass=%s", parts[0], parts[1])
-		}
-	}
-	
-	return rtmpURL
 }
 
 // isGStreamerElementAvailable checks if a GStreamer element is available
