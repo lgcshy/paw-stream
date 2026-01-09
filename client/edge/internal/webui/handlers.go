@@ -272,7 +272,7 @@ func (h *Handler) Login(c *fiber.Ctx) error {
 	// Forward to API server
 	body, _ := json.Marshal(credentials)
 	resp, err := http.Post(
-		apiURL+"/api/auth/login",
+		apiURL+"/api/login",
 		"application/json",
 		bytes.NewBuffer(body),
 	)
