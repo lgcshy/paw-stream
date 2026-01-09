@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -460,4 +461,195 @@ func copyFile(src, dst string) error {
 
 	_, err = io.Copy(destination, source)
 	return err
+}
+
+// GetEnginesAvailable returns available streaming engines
+func (h *Handler) GetEnginesAvailable(c *fiber.Ctx) error {
+	// Import stream package functions (will add these)
+	engines := []map[string]interface{}{
+		{
+			"name":        "ffmpeg",
+			"displayName": "FFmpeg",
+			"description": "兼容性好，通用场景推荐",
+			"available":   true, // FFmpeg is always available
+			"features": []string{
+				"硬件加速支持",
+				"多种编码器",
+				"成熟稳定",
+			},
+		},
+	}
+
+	// Check if GStreamer is available
+	gstAvailable := isGStreamerAvailable()
+	engines = append(engines, map[string]interface{}{
+		"name":        "gstreamer",
+		"displayName": "GStreamer",
+		"description": "低延迟，专业场景推荐",
+		"available":   gstAvailable,
+		"features": []string{
+			"超低延迟（100-200ms）",
+			"丰富的硬件编码器支持",
+			"灵活的 pipeline 架构",
+		},
+		"installCommand": "sudo apt-get install gstreamer1.0-tools gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-rtsp",
+	})
+
+	return c.JSON(map[string]interface{}{
+		"engines": engines,
+	})
+}
+
+// GetPresets returns available configuration presets
+func (h *Handler) GetPresets(c *fiber.Ctx) error {
+	presets := []map[string]interface{}{
+		{
+			"id":          "low-latency",
+			"name":        "低延迟",
+			"description": "优化低延迟（100-200ms）",
+			"engine":      "gstreamer",
+			"latency":     "100-200ms",
+			"quality":     "中等",
+			"resource":    "中等",
+			"scenario":    "监控、实时互动",
+			"icon":        "⚡",
+		},
+		{
+			"id":          "high-quality",
+			"name":        "高质量",
+			"description": "优化视频质量",
+			"engine":      "ffmpeg",
+			"latency":     "1-2s",
+			"quality":     "最高",
+			"resource":    "高",
+			"scenario":    "录制、存档",
+			"icon":        "🎬",
+		},
+		{
+			"id":          "balanced",
+			"name":        "平衡",
+			"description": "平衡质量和延迟",
+			"engine":      "ffmpeg",
+			"latency":     "500ms",
+			"quality":     "良好",
+			"resource":    "中等",
+			"scenario":    "通用场景",
+			"icon":        "⚖️",
+		},
+		{
+			"id":          "power-save",
+			"name":        "省电",
+			"description": "优化资源占用",
+			"engine":      "ffmpeg",
+			"latency":     "500ms",
+			"quality":     "中等",
+			"resource":    "低",
+			"scenario":    "边缘设备、省电模式",
+			"icon":        "🔋",
+		},
+	}
+
+	return c.JSON(map[string]interface{}{
+		"presets": presets,
+	})
+}
+
+// GetEncoders returns available video encoders
+func (h *Handler) GetEncoders(c *fiber.Ctx) error {
+	encoders := map[string]interface{}{
+		"hardware": []map[string]interface{}{},
+		"software": []map[string]interface{}{
+			{
+				"name":        "libx264",
+				"displayName": "x264 (软件)",
+				"available":   true,
+				"type":        "software",
+			},
+		},
+	}
+
+	// Check hardware encoders
+	hwEncoders := []map[string]interface{}{}
+
+	// VAAPI (Intel)
+	if isEncoderAvailable("vaapih264enc") || isEncoderAvailable("h264_vaapi") {
+		hwEncoders = append(hwEncoders, map[string]interface{}{
+			"name":        "vaapi",
+			"displayName": "VAAPI (Intel)",
+			"available":   true,
+			"type":        "hardware",
+			"vendor":      "Intel",
+		})
+	}
+
+	// NVENC (NVIDIA)
+	if isEncoderAvailable("nvh264enc") || isEncoderAvailable("h264_nvenc") {
+		hwEncoders = append(hwEncoders, map[string]interface{}{
+			"name":        "nvenc",
+			"displayName": "NVENC (NVIDIA)",
+			"available":   true,
+			"type":        "hardware",
+			"vendor":      "NVIDIA",
+		})
+	}
+
+	// QSV (Intel Quick Sync)
+	if isEncoderAvailable("h264_qsv") {
+		hwEncoders = append(hwEncoders, map[string]interface{}{
+			"name":        "qsv",
+			"displayName": "Quick Sync (Intel)",
+			"available":   true,
+			"type":        "hardware",
+			"vendor":      "Intel",
+		})
+	}
+
+	// VideoToolbox (macOS)
+	if isEncoderAvailable("vtenc_h264") || isEncoderAvailable("h264_videotoolbox") {
+		hwEncoders = append(hwEncoders, map[string]interface{}{
+			"name":        "videotoolbox",
+			"displayName": "VideoToolbox (Apple)",
+			"available":   true,
+			"type":        "hardware",
+			"vendor":      "Apple",
+		})
+	}
+
+	encoders["hardware"] = hwEncoders
+
+	return c.JSON(encoders)
+}
+
+// isGStreamerAvailable checks if GStreamer is installed
+func isGStreamerAvailable() bool {
+	// Try to run gst-launch-1.0 --version
+	cmd := execCommand("gst-launch-1.0", "--version")
+	_, err := cmd.CombinedOutput()
+	return err == nil
+}
+
+// isEncoderAvailable checks if a specific encoder is available
+func isEncoderAvailable(encoder string) bool {
+	// Check GStreamer element
+	if strings.Contains(encoder, "gst") || !strings.Contains(encoder, "_") {
+		cmd := execCommand("gst-inspect-1.0", encoder)
+		output, err := cmd.CombinedOutput()
+		if err == nil && !strings.Contains(string(output), "No such element") {
+			return true
+		}
+	}
+
+	// Check FFmpeg encoder
+	cmd := execCommand("ffmpeg", "-hide_banner", "-encoders")
+	output, err := cmd.CombinedOutput()
+	if err == nil && strings.Contains(string(output), encoder) {
+		return true
+	}
+
+	return false
+}
+
+// execCommand is a helper to execute commands
+func execCommand(name string, args ...string) *exec.Cmd {
+	return exec.Command(name, args...)
 }

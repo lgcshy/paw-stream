@@ -343,6 +343,102 @@
             to { transform: rotate(360deg); }
         }
 
+        .engine-card, .preset-card {
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .engine-card:hover, .preset-card:hover {
+            border-color: var(--primary-color);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .engine-card.selected, .preset-card.selected {
+            border-color: var(--success-color);
+            background: rgba(76, 175, 80, 0.05);
+        }
+
+        .engine-card.unavailable {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .engine-card.unavailable:hover {
+            transform: none;
+            border-color: var(--border-color);
+        }
+
+        .engine-header, .preset-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+        }
+
+        .engine-name, .preset-name {
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        .engine-badge {
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .badge-available {
+            background: var(--success-color);
+            color: white;
+        }
+
+        .badge-unavailable {
+            background: var(--error-color);
+            color: white;
+        }
+
+        .badge-recommended {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .preset-icon {
+            font-size: 2rem;
+            margin-right: 0.5rem;
+        }
+
+        .preset-meta {
+            display: flex;
+            gap: 1rem;
+            margin-top: 0.5rem;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .preset-meta-item {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .engine-config-panel {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1rem;
+        }
+
+        .hint {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+        }
+
         .hidden {
             display: none !important;
         }
@@ -375,6 +471,10 @@
             </div>
             <div class="step-item" data-step="5">
                 <div class="step-number">5</div>
+                <div class="step-label">推流引擎</div>
+            </div>
+            <div class="step-item" data-step="6">
+                <div class="step-number">6</div>
                 <div class="step-label">完成</div>
             </div>
         </div>
@@ -478,14 +578,86 @@
 
             <div class="button-group">
                 <button class="btn btn-secondary" onclick="prevStep()">上一步</button>
-                <button class="btn btn-primary" onclick="saveAndFinish()" id="btn-finish">
+                <button class="btn btn-primary" onclick="nextStep()">
+                    下一步
+                </button>
+            </div>
+        </div>
+
+        <!-- 步骤 5: 推流引擎和预设 -->
+        <div class="step-content" id="step-5">
+            <h2>选择推流引擎和预设</h2>
+            <div id="step5-alert"></div>
+
+            <h3>推流引擎</h3>
+            <p class="hint">不同的引擎适合不同的场景，您也可以选择预设配置自动选择最佳引擎</p>
+            
+            <div id="engines-list"></div>
+
+            <h3 style="margin-top: 2rem;">预设配置（可选）</h3>
+            <p class="hint">预设会自动配置引擎和编码参数，您也可以在下方手动配置</p>
+            
+            <div id="presets-list"></div>
+
+            <div id="engine-config-container" style="margin-top: 2rem;">
+                <h3>高级配置</h3>
+                <div id="ffmpeg-config" class="engine-config-panel">
+                    <div class="form-group">
+                        <label>FFmpeg 预设</label>
+                        <select id="ffmpeg-preset">
+                            <option value="ultrafast">ultrafast（极快）</option>
+                            <option value="superfast">superfast（超快）</option>
+                            <option value="veryfast">veryfast（很快）</option>
+                            <option value="faster">faster（较快）</option>
+                            <option value="fast">fast（快）</option>
+                            <option value="medium">medium（中等）</option>
+                            <option value="slow">slow（慢）</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>调优选项</label>
+                        <select id="ffmpeg-tune">
+                            <option value="zerolatency">zerolatency（零延迟）</option>
+                            <option value="film">film（电影）</option>
+                            <option value="animation">animation（动画）</option>
+                            <option value="fastdecode">fastdecode（快速解码）</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>硬件加速</label>
+                        <select id="ffmpeg-hwaccel">
+                            <option value="auto">auto（自动检测）</option>
+                            <option value="none">none（软件编码）</option>
+                            <option value="vaapi">vaapi（Intel）</option>
+                            <option value="nvenc">nvenc（NVIDIA）</option>
+                            <option value="qsv">qsv（Intel Quick Sync）</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="gstreamer-config" class="engine-config-panel hidden">
+                    <div class="form-group">
+                        <label>延迟（毫秒）</label>
+                        <input type="number" id="gst-latency" value="100" min="0" max="2000">
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="gst-hardware" checked>
+                            使用硬件编码
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="button-group">
+                <button class="btn btn-secondary" onclick="prevStep()">上一步</button>
+                <button class="btn btn-primary" onclick="saveAndFinish()">
                     完成配置
                 </button>
             </div>
         </div>
 
-        <!-- 步骤 5: 完成 -->
-        <div class="step-content" id="step-5">
+        <!-- 步骤 6: 完成 -->
+        <div class="step-content" id="step-6">
             <h2>✅ 配置完成</h2>
             <div id="step5-alert"></div>
             
@@ -510,6 +682,14 @@
                 <div class="config-item">
                     <span class="config-label">输入源:</span>
                     <span class="config-value" id="summary-input-source"></span>
+                </div>
+                <div class="config-item">
+                    <span class="config-label">推流引擎:</span>
+                    <span class="config-value" id="summary-engine"></span>
+                </div>
+                <div class="config-item">
+                    <span class="config-label">预设配置:</span>
+                    <span class="config-value" id="summary-preset"></span>
                 </div>
                 <div class="config-item">
                     <span class="config-label">配置文件:</span>

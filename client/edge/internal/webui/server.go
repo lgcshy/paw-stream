@@ -120,6 +120,11 @@ func (s *Server) setupRoutes() {
 	// Input sources detection
 	api.Get("/input-sources", s.handler.DetectInputSources)
 
+	// Streaming engines
+	api.Get("/engines/available", s.handler.GetEnginesAvailable)
+	api.Get("/engines/encoders", s.handler.GetEncoders)
+	api.Get("/presets", s.handler.GetPresets)
+
 	// Logs
 	api.Get("/logs/recent", s.handler.GetRecentLogs)
 

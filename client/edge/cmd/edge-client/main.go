@@ -515,11 +515,20 @@ func runClientWithOverrides(configFile string, overrides *configOverrides) {
 
 	// Create stream manager
 	streamCfg := stream.Config{
-		VideoCodec:           cfg.Video.Codec,
-		VideoBitrate:         cfg.Video.Bitrate,
-		Preset:               "ultrafast",
-		ReconnectInterval:    cfg.Stream.ReconnectInterval,
-		MaxReconnectAttempts: cfg.Stream.MaxReconnectAttempts,
+		Engine:                   stream.EngineType(cfg.Stream.Engine),
+		VideoCodec:               cfg.Video.Codec,
+		VideoBitrate:             cfg.Video.Bitrate,
+		VideoWidth:               cfg.Video.Width,
+		VideoHeight:              cfg.Video.Height,
+		VideoFramerate:           cfg.Video.Framerate,
+		FFmpegPreset:             cfg.Stream.FFmpeg.Preset,
+		FFmpegTune:               cfg.Stream.FFmpeg.Tune,
+		FFmpegHWAccel:            cfg.Stream.FFmpeg.HWAccel,
+		GStreamerLatencyMs:       cfg.Stream.GStreamer.LatencyMs,
+		GStreamerUseHardware:     cfg.Stream.GStreamer.UseHardware,
+		GStreamerBufferSize:      cfg.Stream.GStreamer.BufferSize,
+		ReconnectInterval:        cfg.Stream.ReconnectInterval,
+		MaxReconnectAttempts:     cfg.Stream.MaxReconnectAttempts,
 	}
 
 	streamMgr := stream.NewManager(inputSource, outputURL, streamCfg, log.Logger)
