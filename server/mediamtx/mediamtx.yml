@@ -18,7 +18,7 @@ logFile: mediamtx.log
 sysLogPrefix: mediamtx
 
 # Timeout of read operations.
-readTimeout: 10s
+readTimeout: 30m
 # Timeout of write operations.
 writeTimeout: 10s
 # Size of the queue of outgoing packets.
