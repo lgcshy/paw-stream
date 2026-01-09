@@ -23,9 +23,25 @@ type StreamStatus struct {
 
 // Config holds stream manager configuration
 type Config struct {
-	VideoCodec           string
-	VideoBitrate         int
-	Preset               string
+	// Engine configuration
+	Engine         EngineType
+	VideoCodec     string
+	VideoBitrate   int
+	VideoWidth     int
+	VideoHeight    int
+	VideoFramerate int
+	
+	// FFmpeg specific
+	FFmpegPreset   string
+	FFmpegTune     string
+	FFmpegHWAccel  string
+	
+	// GStreamer specific
+	GStreamerLatencyMs   int
+	GStreamerUseHardware bool
+	GStreamerBufferSize  int
+	
+	// Reconnect configuration
 	ReconnectInterval    time.Duration
 	MaxReconnectAttempts int
 }
@@ -71,12 +87,32 @@ func (m *Manager) Start(ctx context.Context) error {
 	m.ctx, m.cancel = context.WithCancel(ctx)
 	m.startTime = time.Now()
 
-	// Build FFmpeg arguments
-	inputArgs := m.input.FFmpegArgs()
-	outputArgs := m.buildOutputArgs()
-
-	// Create stream engine (default to FFmpeg for now)
-	m.engine = NewFFmpegEngine(inputArgs, outputArgs, m.logger)
+	// Create stream engine using factory
+	engineConfig := EngineConfig{
+		Type:                 m.config.Engine,
+		Input:                m.input,
+		Output:               m.output,
+		VideoCodec:           m.config.VideoCodec,
+		VideoBitrate:         m.config.VideoBitrate,
+		VideoWidth:           m.config.VideoWidth,
+		VideoHeight:          m.config.VideoHeight,
+		VideoFramerate:       m.config.VideoFramerate,
+		FFmpegPreset:         m.config.FFmpegPreset,
+		FFmpegTune:           m.config.FFmpegTune,
+		FFmpegHWAccel:        m.config.FFmpegHWAccel,
+		GStreamerLatencyMs:   m.config.GStreamerLatencyMs,
+		GStreamerUseHardware: m.config.GStreamerUseHardware,
+		GStreamerBufferSize:  m.config.GStreamerBufferSize,
+	}
+	
+	var err error
+	m.engine, err = NewStreamEngine(engineConfig, m.logger)
+	if err != nil {
+		m.state = "error"
+		m.lastError = err.Error()
+		m.errorCount.Add(1)
+		return fmt.Errorf("failed to create stream engine: %w", err)
+	}
 
 	// Start engine
 	if err := m.engine.Start(m.ctx); err != nil {
@@ -197,9 +233,29 @@ func (m *Manager) handleError(err error) {
 	time.Sleep(m.config.ReconnectInterval)
 
 	// Attempt to restart with same engine type
-	inputArgs := m.input.FFmpegArgs()
-	outputArgs := m.buildOutputArgs()
-	m.engine = NewFFmpegEngine(inputArgs, outputArgs, m.logger)
+	engineConfig := EngineConfig{
+		Type:                 m.config.Engine,
+		Input:                m.input,
+		Output:               m.output,
+		VideoCodec:           m.config.VideoCodec,
+		VideoBitrate:         m.config.VideoBitrate,
+		VideoWidth:           m.config.VideoWidth,
+		VideoHeight:          m.config.VideoHeight,
+		VideoFramerate:       m.config.VideoFramerate,
+		FFmpegPreset:         m.config.FFmpegPreset,
+		FFmpegTune:           m.config.FFmpegTune,
+		FFmpegHWAccel:        m.config.FFmpegHWAccel,
+		GStreamerLatencyMs:   m.config.GStreamerLatencyMs,
+		GStreamerUseHardware: m.config.GStreamerUseHardware,
+		GStreamerBufferSize:  m.config.GStreamerBufferSize,
+	}
+	
+	var createErr error
+	m.engine, createErr = NewStreamEngine(engineConfig, m.logger)
+	if createErr != nil {
+		m.logger.Error().Err(createErr).Msg("Failed to create engine for reconnect")
+		return
+	}
 
 	if err := m.engine.Start(m.ctx); err != nil {
 		m.logger.Error().Err(err).Msg("Failed to reconnect")
@@ -210,20 +266,4 @@ func (m *Manager) handleError(err error) {
 	m.state = "streaming"
 	m.logger.Info().Msg("Reconnected successfully")
 	m.reconnectCount.Store(0) // Reset counter on success
-}
-
-// buildOutputArgs builds FFmpeg output arguments
-func (m *Manager) buildOutputArgs() []string {
-	args := []string{
-		"-c:v", m.config.VideoCodec,
-		"-preset", m.config.Preset,
-		"-b:v", fmt.Sprintf("%d", m.config.VideoBitrate),
-		"-tune", "zerolatency",
-		"-f", "rtsp",
-	}
-
-	// Add output URL
-	args = append(args, m.output)
-
-	return args
 }
