@@ -90,8 +90,11 @@ func (g *GStreamerEngine) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to build pipeline: %w", err)
 	}
 
-	// Create command
-	g.cmd = exec.CommandContext(g.ctx, "gst-launch-1.0", pipeline...)
+	// Join pipeline into a single string
+	pipelineStr := strings.Join(pipeline, " ")
+
+	// Create command with pipeline as single argument
+	g.cmd = exec.CommandContext(g.ctx, "gst-launch-1.0", pipelineStr)
 
 	// Capture stdout and stderr
 	stdout, err := g.cmd.StdoutPipe()
