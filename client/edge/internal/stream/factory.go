@@ -2,6 +2,7 @@ package stream
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/lgc/pawstream/edge-client/internal/capture"
 	"github.com/rs/zerolog"
@@ -142,11 +143,40 @@ func getFFmpegHWEncoder(hwaccel string) string {
 
 // isFFmpegEncoderAvailable checks if an FFmpeg encoder is available
 func isFFmpegEncoderAvailable(encoder string) bool {
+	// First check if encoder is in the list
 	output, err := execCommand("ffmpeg", "-hide_banner", "-encoders")
 	if err != nil {
 		return false
 	}
-	return contains(output, encoder)
+	if !contains(output, encoder) {
+		return false
+	}
+	
+	// Actually test if the encoder works by trying to encode a test frame
+	// This catches cases where encoder exists but dependencies (like CUDA) are missing
+	testCmd := fmt.Sprintf("ffmpeg -f lavfi -i testsrc=size=64x64:rate=1 -frames:v 1 -c:v %s -f null - 2>&1", encoder)
+	testOutput, testErr := execCommand("sh", "-c", testCmd)
+	if testErr != nil {
+		// Encoder failed the test
+		return false
+	}
+	
+	// Check if test output contains error indicators
+	errorIndicators := []string{
+		"Cannot load",
+		"No device",
+		"not supported",
+		"initialization failed",
+		"Error initializing",
+	}
+	testOutputLower := strings.ToLower(testOutput)
+	for _, indicator := range errorIndicators {
+		if strings.Contains(testOutputLower, strings.ToLower(indicator)) {
+			return false
+		}
+	}
+	
+	return true
 }
 
 // contains checks if a string contains a substring
