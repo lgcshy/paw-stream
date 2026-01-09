@@ -214,6 +214,13 @@ func (h *Handler) ValidateAPIServer(c *fiber.Ctx) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusOK {
+		// Save the validated API URL for later use (e.g., in Login)
+		h.mu.Lock()
+		h.apiURL = req.URL
+		h.mu.Unlock()
+		
+		h.logger.Info().Str("api_url", req.URL).Msg("API server validated and saved")
+		
 		return c.JSON(fiber.Map{
 			"valid":   true,
 			"message": "API server is reachable",
@@ -240,10 +247,22 @@ func (h *Handler) Login(c *fiber.Ctx) error {
 		})
 	}
 
+	// Get API URL
+	h.mu.RLock()
+	apiURL := h.apiURL
+	h.mu.RUnlock()
+
+	if apiURL == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error":   true,
+			"message": "API server URL not configured. Please validate API server first.",
+		})
+	}
+
 	// Forward to API server
 	body, _ := json.Marshal(credentials)
 	resp, err := http.Post(
-		h.apiURL+"/api/auth/login",
+		apiURL+"/api/auth/login",
 		"application/json",
 		bytes.NewBuffer(body),
 	)
@@ -271,7 +290,19 @@ func (h *Handler) GetDevices(c *fiber.Ctx) error {
 		})
 	}
 
-	req, _ := http.NewRequest(http.MethodGet, h.apiURL+"/api/devices", nil)
+	// Get API URL
+	h.mu.RLock()
+	apiURL := h.apiURL
+	h.mu.RUnlock()
+
+	if apiURL == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error":   true,
+			"message": "API server URL not configured",
+		})
+	}
+
+	req, _ := http.NewRequest(http.MethodGet, apiURL+"/api/devices", nil)
 	req.Header.Set("Authorization", token)
 
 	client := &http.Client{Timeout: 10 * time.Second}
@@ -298,7 +329,19 @@ func (h *Handler) CreateDevice(c *fiber.Ctx) error {
 		})
 	}
 
-	req, _ := http.NewRequest(http.MethodPost, h.apiURL+"/api/devices", bytes.NewBuffer(c.Body()))
+	// Get API URL
+	h.mu.RLock()
+	apiURL := h.apiURL
+	h.mu.RUnlock()
+
+	if apiURL == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error":   true,
+			"message": "API server URL not configured",
+		})
+	}
+
+	req, _ := http.NewRequest(http.MethodPost, apiURL+"/api/devices", bytes.NewBuffer(c.Body()))
 	req.Header.Set("Authorization", token)
 	req.Header.Set("Content-Type", "application/json")
 
