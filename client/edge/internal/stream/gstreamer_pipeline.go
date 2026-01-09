@@ -207,8 +207,7 @@ func (g *GStreamerEngine) buildOutputElements() []string {
 	location, userId, userPw := parseRTSPAuth(g.output)
 	
 	// Build element with properties
-	// Each property needs to be a separate string in the format "element prop1=val1 prop2=val2"
-	// But when passed as command args, we need to construct it correctly
+	// Note: rtspclientsink handles RTP payloading internally, so we don't need rtph264pay
 	var sinkElement string
 	if userId != "" && userPw != "" {
 		sinkElement = fmt.Sprintf(`rtspclientsink location="%s" user-id="%s" user-pw="%s" latency=%d`,
@@ -219,7 +218,6 @@ func (g *GStreamerEngine) buildOutputElements() []string {
 	}
 	
 	return []string{
-		"rtph264pay config-interval=1 pt=96",
 		sinkElement,
 	}
 }
