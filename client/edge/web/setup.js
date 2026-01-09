@@ -183,7 +183,8 @@ async function loadDevices() {
         }
         
         const data = await response.json();
-        setupState.devices = data.devices || [];
+        // API returns array directly or {devices: [...]}
+        setupState.devices = Array.isArray(data) ? data : (data.devices || []);
         
         if (setupState.devices.length > 0) {
             renderDeviceList();
