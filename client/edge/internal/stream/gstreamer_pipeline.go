@@ -206,18 +206,21 @@ func (g *GStreamerEngine) buildOutputElements() []string {
 	// rtspclientsink uses separate user-id and user-pw properties
 	location, userId, userPw := parseRTSPAuth(g.output)
 	
-	var sink string
+	// Build element with properties
+	// Each property needs to be a separate string in the format "element prop1=val1 prop2=val2"
+	// But when passed as command args, we need to construct it correctly
+	var sinkElement string
 	if userId != "" && userPw != "" {
-		sink = fmt.Sprintf("rtspclientsink location=%s user-id=%s user-pw=%s latency=%d",
+		sinkElement = fmt.Sprintf(`rtspclientsink location="%s" user-id="%s" user-pw="%s" latency=%d`,
 			location, userId, userPw, g.config.LatencyMs)
 	} else {
-		sink = fmt.Sprintf("rtspclientsink location=%s latency=%d",
+		sinkElement = fmt.Sprintf(`rtspclientsink location="%s" latency=%d`,
 			location, g.config.LatencyMs)
 	}
 	
 	return []string{
 		"rtph264pay config-interval=1 pt=96",
-		sink,
+		sinkElement,
 	}
 }
 
