@@ -9,11 +9,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/lgc/pawstream/edge-client/internal/config"
 	"github.com/rs/zerolog"
 	"gopkg.in/yaml.v3"
 )
@@ -116,16 +118,70 @@ func (h *Handler) GetConfig(c *fiber.Ctx) error {
 
 // SaveConfig saves the configuration
 func (h *Handler) SaveConfig(c *fiber.Ctx) error {
-	var config map[string]interface{}
-	if err := c.BodyParser(&config); err != nil {
+	var flatConfig map[string]interface{}
+	if err := c.BodyParser(&flatConfig); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error":   true,
 			"message": "Invalid request body",
 		})
 	}
 
+	// Convert flat config from Web UI to structured Config
+	cfg := &config.Config{
+		Device: config.DeviceConfig{
+			ID:     getStringValue(flatConfig, "device_id"),
+			Secret: getStringValue(flatConfig, "device_secret"),
+		},
+		API: config.APIConfig{
+			URL:     getStringValue(flatConfig, "api_url"),
+			Timeout: 10 * time.Second,
+		},
+		Input: config.InputConfig{
+			Type:   getStringValue(flatConfig, "input_type"),
+			Source: getStringValue(flatConfig, "input_source"),
+		},
+		Video: config.VideoConfig{
+			Codec:     getStringValueWithDefault(flatConfig, "video_codec", "h264"),
+			Width:     getIntValueWithDefault(flatConfig, "video_width", 1280),
+			Height:    getIntValueWithDefault(flatConfig, "video_height", 720),
+			Framerate: getIntValueWithDefault(flatConfig, "video_framerate", 30),
+			Bitrate:   getIntValueWithDefault(flatConfig, "video_bitrate", 2000000),
+		},
+		Stream: config.StreamConfig{
+			URL:                  getStringValueWithDefault(flatConfig, "mediamtx_url", "rtsp://localhost:8554"),
+			Engine:               getStringValueWithDefault(flatConfig, "stream_engine", "ffmpeg"),
+			Preset:               getStringValue(flatConfig, "stream_preset"),
+			ReconnectInterval:    5 * time.Second,
+			MaxReconnectAttempts: 0,
+			FFmpeg: config.FFmpegConfig{
+				Preset:  getStringValueWithDefault(flatConfig, "ffmpeg_preset", "medium"),
+				Tune:    getStringValueWithDefault(flatConfig, "ffmpeg_tune", "zerolatency"),
+				HWAccel: getStringValueWithDefault(flatConfig, "ffmpeg_hwaccel", "auto"),
+			},
+			GStreamer: config.GStreamerConfig{
+				LatencyMs:   getIntValueWithDefault(flatConfig, "gstreamer_latency_ms", 100),
+				UseHardware: getBoolValueWithDefault(flatConfig, "gstreamer_use_hardware", true),
+			},
+		},
+		Log: config.LogConfig{
+			Level:  "info",
+			Format: "json",
+		},
+		Health: config.HealthConfig{
+			Enabled: false,
+			Address: ":9090",
+		},
+		WebUI: &config.WebUIConfig{
+			Enabled: true,
+			Host:    "0.0.0.0",
+			Port:    8088,
+		},
+		ShutdownTimeout:      10 * time.Second,
+		ValidateInputOnStart: true,
+	}
+
 	// Convert to YAML
-	data, err := yaml.Marshal(config)
+	data, err := yaml.Marshal(cfg)
 	if err != nil {
 		h.logger.Error().Err(err).Msg("Failed to marshal config")
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -495,6 +551,65 @@ func (h *Handler) ImportConfig(c *fiber.Ctx) error {
 		"message": "Configuration imported and reload triggered",
 		"backup":  backupPath,
 	})
+}
+
+// Helper functions to extract values from flat config map
+func getStringValue(m map[string]interface{}, key string) string {
+	if v, ok := m[key]; ok {
+		if s, ok := v.(string); ok {
+			return s
+		}
+	}
+	return ""
+}
+
+func getStringValueWithDefault(m map[string]interface{}, key, defaultValue string) string {
+	if v := getStringValue(m, key); v != "" {
+		return v
+	}
+	return defaultValue
+}
+
+func getIntValue(m map[string]interface{}, key string) int {
+	if v, ok := m[key]; ok {
+		switch val := v.(type) {
+		case int:
+			return val
+		case float64:
+			return int(val)
+		case string:
+			// Try to parse string as int
+			if i, err := strconv.Atoi(val); err == nil {
+				return i
+			}
+		}
+	}
+	return 0
+}
+
+func getIntValueWithDefault(m map[string]interface{}, key string, defaultValue int) int {
+	if v := getIntValue(m, key); v != 0 {
+		return v
+	}
+	return defaultValue
+}
+
+func getBoolValue(m map[string]interface{}, key string) bool {
+	if v, ok := m[key]; ok {
+		if b, ok := v.(bool); ok {
+			return b
+		}
+	}
+	return false
+}
+
+func getBoolValueWithDefault(m map[string]interface{}, key string, defaultValue bool) bool {
+	if v, ok := m[key]; ok {
+		if b, ok := v.(bool); ok {
+			return b
+		}
+	}
+	return defaultValue
 }
 
 // copyFile copies a file
