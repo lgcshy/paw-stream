@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"regexp"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -124,6 +125,9 @@ func (g *GStreamerEngine) Start(ctx context.Context) error {
 		}
 	}()
 
+	// Buffer to capture stderr for error reporting
+	var stderrBuf strings.Builder
+	
 	// Monitor stderr (GStreamer outputs logs to stderr)
 	go func() {
 		scanner := bufio.NewScanner(stderr)
@@ -131,6 +135,10 @@ func (g *GStreamerEngine) Start(ctx context.Context) error {
 			line := scanner.Text()
 			g.parseStatsFromLog(line)
 			g.logger.Debug().Str("stderr", line).Msg("GStreamer log")
+			
+			// Buffer stderr for error reporting
+			stderrBuf.WriteString(line)
+			stderrBuf.WriteString("\n")
 		}
 	}()
 
@@ -140,7 +148,15 @@ func (g *GStreamerEngine) Start(ctx context.Context) error {
 		g.running.Store(false)
 
 		if err != nil {
-			g.logger.Error().Err(err).Msg("GStreamer process exited with error")
+			// Log GStreamer stderr output on error
+			if stderrOutput := stderrBuf.String(); stderrOutput != "" {
+				g.logger.Error().
+					Err(err).
+					Str("gstreamer_output", stderrOutput).
+					Msg("GStreamer process exited with error")
+			} else {
+				g.logger.Error().Err(err).Msg("GStreamer process exited with error")
+			}
 			select {
 			case g.errorCh <- err:
 			default:
