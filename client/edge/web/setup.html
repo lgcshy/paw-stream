@@ -467,14 +467,6 @@
             </div>
             <div class="step-item" data-step="4">
                 <div class="step-number">4</div>
-                <div class="step-label">输入源</div>
-            </div>
-            <div class="step-item" data-step="5">
-                <div class="step-number">5</div>
-                <div class="step-label">推流引擎</div>
-            </div>
-            <div class="step-item" data-step="6">
-                <div class="step-number">6</div>
                 <div class="step-label">完成</div>
             </div>
         </div>
@@ -557,117 +549,10 @@
             </div>
         </div>
 
-        <!-- 步骤 4: 输入源配置 -->
+        <!-- 步骤 4: 完成 -->
         <div class="step-content" id="step-4">
-            <h2>选择输入源</h2>
-            <div id="step4-alert"></div>
-            
-            <button class="btn btn-secondary" onclick="detectSources()" style="margin-bottom: 1rem;">
-                🔍 检测输入源
-            </button>
-
-            <div class="source-list" id="source-list"></div>
-
-            <div id="custom-source-container" class="hidden" style="margin-top: 1.5rem;">
-                <h3>或输入自定义源</h3>
-                <div class="form-group">
-                    <label for="custom-source-type">类型</label>
-                    <select id="custom-source-type">
-                        <option value="v4l2">V4L2 设备</option>
-                        <option value="rtsp">RTSP 流</option>
-                        <option value="file">视频文件</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="custom-source">源路径/URL</label>
-                    <input type="text" id="custom-source" placeholder="/dev/video0 或 rtsp://...">
-                </div>
-            </div>
-
-            <div class="button-group">
-                <button class="btn btn-secondary" onclick="prevStep()">上一步</button>
-                <button class="btn btn-primary" onclick="nextStep()">
-                    下一步
-                </button>
-            </div>
-        </div>
-
-        <!-- 步骤 5: 推流引擎和预设 -->
-        <div class="step-content" id="step-5">
-            <h2>选择推流引擎和预设</h2>
-            <div id="step5-alert"></div>
-
-            <h3>推流引擎</h3>
-            <p class="hint">不同的引擎适合不同的场景，您也可以选择预设配置自动选择最佳引擎</p>
-            
-            <div id="engines-list"></div>
-
-            <h3 style="margin-top: 2rem;">预设配置（可选）</h3>
-            <p class="hint">预设会自动配置引擎和编码参数，您也可以在下方手动配置</p>
-            
-            <div id="presets-list"></div>
-
-            <div id="engine-config-container" style="margin-top: 2rem;">
-                <h3>高级配置</h3>
-                <div id="ffmpeg-config" class="engine-config-panel">
-                    <div class="form-group">
-                        <label>FFmpeg 预设</label>
-                        <select id="ffmpeg-preset">
-                            <option value="ultrafast">ultrafast（极快）</option>
-                            <option value="superfast">superfast（超快）</option>
-                            <option value="veryfast">veryfast（很快）</option>
-                            <option value="faster">faster（较快）</option>
-                            <option value="fast">fast（快）</option>
-                            <option value="medium">medium（中等）</option>
-                            <option value="slow">slow（慢）</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>调优选项</label>
-                        <select id="ffmpeg-tune">
-                            <option value="zerolatency">zerolatency（零延迟）</option>
-                            <option value="film">film（电影）</option>
-                            <option value="animation">animation（动画）</option>
-                            <option value="fastdecode">fastdecode（快速解码）</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>硬件加速</label>
-                        <select id="ffmpeg-hwaccel">
-                            <option value="auto">auto（自动检测）</option>
-                            <option value="none">none（软件编码）</option>
-                            <option value="vaapi">vaapi（Intel）</option>
-                            <option value="nvenc">nvenc（NVIDIA）</option>
-                            <option value="qsv">qsv（Intel Quick Sync）</option>
-                        </select>
-                    </div>
-                </div>
-                <div id="gstreamer-config" class="engine-config-panel hidden">
-                    <div class="form-group">
-                        <label>延迟（毫秒）</label>
-                        <input type="number" id="gst-latency" value="100" min="0" max="2000">
-                    </div>
-                    <div class="form-group">
-                        <label>
-                            <input type="checkbox" id="gst-hardware" checked>
-                            使用硬件编码
-                        </label>
-                    </div>
-                </div>
-            </div>
-
-            <div class="button-group">
-                <button class="btn btn-secondary" onclick="prevStep()">上一步</button>
-                <button class="btn btn-primary" id="btn-finish" onclick="saveAndFinish()">
-                    完成配置
-                </button>
-            </div>
-        </div>
-
-        <!-- 步骤 6: 完成 -->
-        <div class="step-content" id="step-6">
             <h2>✅ 配置完成</h2>
-            <div id="step5-alert"></div>
+            <div id="step4-alert"></div>
             
             <div class="config-summary">
                 <h3>配置摘要</h3>
@@ -684,20 +569,8 @@
                     <span class="config-value" id="summary-device-name"></span>
                 </div>
                 <div class="config-item">
-                    <span class="config-label">输入类型:</span>
-                    <span class="config-value" id="summary-input-type"></span>
-                </div>
-                <div class="config-item">
-                    <span class="config-label">输入源:</span>
-                    <span class="config-value" id="summary-input-source"></span>
-                </div>
-                <div class="config-item">
-                    <span class="config-label">推流引擎:</span>
-                    <span class="config-value" id="summary-engine"></span>
-                </div>
-                <div class="config-item">
-                    <span class="config-label">预设配置:</span>
-                    <span class="config-value" id="summary-preset"></span>
+                    <span class="config-label">推流路径:</span>
+                    <span class="config-value" id="summary-stream-path"></span>
                 </div>
                 <div class="config-item">
                     <span class="config-label">配置文件:</span>
@@ -705,14 +578,22 @@
                 </div>
             </div>
 
-            <div class="alert alert-success" style="margin-top: 1.5rem;">
+            <div class="alert alert-info" style="margin-top: 1.5rem;">
+                <strong>🤖 智能配置</strong><br>
+                • 输入源：自动检测（摄像头优先，无摄像头时使用测试源）<br>
+                • 推流引擎：GStreamer（低延迟、高性能）<br>
+                • 编码参数：自动优化
+            </div>
+
+            <div class="alert alert-success" style="margin-top: 1rem;">
                 <strong>🎉 配置已保存！</strong><br>
                 配置文件已成功创建。客户端将自动重新加载配置并开始推流。
             </div>
 
             <div class="button-group">
-                <button class="btn btn-primary" onclick="window.location.href='/'">
-                    进入管理界面
+                <button class="btn btn-secondary" onclick="prevStep()">上一步</button>
+                <button class="btn btn-primary" id="btn-finish" onclick="saveAndFinish()">
+                    完成并开始推流
                 </button>
             </div>
         </div>

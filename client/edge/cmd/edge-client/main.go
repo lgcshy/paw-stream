@@ -17,6 +17,7 @@ import (
 	"github.com/lgc/pawstream/edge-client/internal/capture"
 	"github.com/lgc/pawstream/edge-client/internal/config"
 	"github.com/lgc/pawstream/edge-client/internal/health"
+	"github.com/lgc/pawstream/edge-client/internal/input"
 	"github.com/lgc/pawstream/edge-client/internal/stream"
 	"github.com/lgc/pawstream/edge-client/internal/webui"
 	"github.com/rs/zerolog"
@@ -346,6 +347,28 @@ func runClientWithOverrides(configFile string, overrides *configOverrides) {
 	if overrides.logLevel != "" {
 		cfg.Log.Level = overrides.logLevel
 		fmt.Printf("🔧 Override: log.level = %s\n", overrides.logLevel)
+	}
+
+	// Auto-detect input source if needed
+	if cfg.Input.Type == "auto" || cfg.Input.Source == "auto" {
+		fmt.Printf("🔍 Auto-detecting input source...\n")
+		detectedType, detectedSource, err := input.AutoDetectInput()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Auto-detection failed: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Falling back to test pattern\n")
+			cfg.Input.Type = "test"
+			cfg.Input.Source = "pattern=smpte"
+		} else {
+			cfg.Input.Type = detectedType
+			cfg.Input.Source = detectedSource
+			fmt.Printf("✅ Detected: %s -> %s\n", detectedType, detectedSource)
+		}
+	}
+
+	// Default to GStreamer if engine not specified
+	if cfg.Stream.Engine == "" {
+		cfg.Stream.Engine = "gstreamer"
+		fmt.Printf("🎬 Using default engine: gstreamer\n")
 	}
 
 	// Check configuration completeness (after applying overrides)

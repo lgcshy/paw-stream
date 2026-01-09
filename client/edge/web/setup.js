@@ -3,17 +3,11 @@
 // Global state
 const setupState = {
     currentStep: 1,
+    maxStep: 4,  // Now only 4 steps
     apiURL: '',
     token: '',
     selectedDevice: null,
-    selectedSource: null,
-    selectedEngine: 'ffmpeg',
-    selectedPreset: null,
-    devices: [],
-    sources: [],
-    engines: [],
-    presets: [],
-    encoders: {}
+    devices: []
 };
 
 // Initialize
@@ -337,101 +331,21 @@ async function selectOrCreateDevice() {
 }
 
 // Step 4: Detect and select input sources
-async function detectSources() {
-    clearAlert(4);
-    
-    try {
-        const response = await fetch('/api/input-sources');
-        const data = await response.json();
-        
-        setupState.sources = data.sources || data || [];
-        renderSourceList();
-        
-        console.log(`[Setup] Detected ${setupState.sources.length} sources`);
-        showAlert(4, 'success', `✅ 检测到 ${setupState.sources.length} 个输入源`);
-        
-        // Show custom source option
-        document.getElementById('custom-source-container').classList.remove('hidden');
-    } catch (error) {
-        console.error('[Setup] Source detection error:', error);
-        showAlert(4, 'error', `检测失败: ${error.message}`);
-        
-        // Still show custom source option
-        document.getElementById('custom-source-container').classList.remove('hidden');
-    }
-}
-
-function renderSourceList() {
-    const listEl = document.getElementById('source-list');
-    listEl.innerHTML = '';
-    
-    setupState.sources.forEach(source => {
-        const card = document.createElement('div');
-        card.className = 'source-card';
-        card.innerHTML = `
-            <span class="source-type ${source.type}">${source.type.toUpperCase()}</span>
-            <div class="source-name">${source.name || source.type}</div>
-            <div class="source-device">${source.device || source.source}</div>
-            ${source.description ? `<div class="source-description">${source.description}</div>` : ''}
-        `;
-        
-        card.addEventListener('click', () => {
-            // Deselect all
-            document.querySelectorAll('.source-card').forEach(el => {
-                el.classList.remove('selected');
-            });
-            // Select this one
-            card.classList.add('selected');
-            setupState.selectedSource = source;
-            console.log('[Setup] Selected source:', source);
-        });
-        
-        listEl.appendChild(card);
-    });
-}
-
 async function saveAndFinish() {
-    // Check if source is selected or custom source is provided
-    let inputType, inputSource;
-    
-    if (setupState.selectedSource) {
-        inputType = setupState.selectedSource.type;
-        inputSource = setupState.selectedSource.device || setupState.selectedSource.source;
-    } else {
-        // Check custom source
-        inputType = document.getElementById('custom-source-type').value;
-        inputSource = document.getElementById('custom-source').value.trim();
-        
-        if (!inputSource) {
-            showAlert(4, 'error', '请选择一个输入源或输入自定义源');
-            return;
-        }
-    }
-    
     clearAlert(4);
     setButtonLoading('btn-finish', true, '保存中...');
     
-    // Prepare configuration
+    // Prepare simplified configuration with smart defaults
     const config = {
         device_id: setupState.selectedDevice.id,
         device_secret: setupState.selectedDevice.secret,
         api_url: setupState.apiURL,
-        input_type: inputType,
-        input_source: inputSource,
-        mediamtx_url: 'rtsp://localhost:8554',
-        stream_engine: setupState.selectedEngine,
-        stream_preset: setupState.selectedPreset || ''
+        // Smart defaults - will be auto-detected by backend
+        input_type: 'auto',           // Auto-detect: v4l2 > test
+        input_source: 'auto',          // Auto-detect
+        stream_engine: 'gstreamer',    // Default to GStreamer
+        mediamtx_url: 'rtsp://localhost:8554'
     };
-    
-    // Add engine-specific configuration
-    if (setupState.selectedEngine === 'ffmpeg') {
-        config.ffmpeg_preset = document.getElementById('ffmpeg-preset').value;
-        config.ffmpeg_tune = document.getElementById('ffmpeg-tune').value;
-        config.ffmpeg_hwaccel = document.getElementById('ffmpeg-hwaccel').value;
-    } else if (setupState.selectedEngine === 'gstreamer') {
-        config.gstreamer_latency_ms = parseInt(document.getElementById('gst-latency').value);
-        config.gstreamer_use_hardware = document.getElementById('gst-hardware').checked;
-    }
     
     try {
         const response = await fetch('/api/config', {
@@ -449,186 +363,29 @@ async function saveAndFinish() {
             document.getElementById('summary-api-url').textContent = setupState.apiURL;
             document.getElementById('summary-device-id').textContent = setupState.selectedDevice.id;
             document.getElementById('summary-device-name').textContent = setupState.selectedDevice.name;
-            document.getElementById('summary-input-type').textContent = inputType;
-            document.getElementById('summary-input-source').textContent = inputSource;
-            document.getElementById('summary-engine').textContent = setupState.selectedEngine;
-            document.getElementById('summary-preset').textContent = setupState.selectedPreset || '自定义配置';
+            document.getElementById('summary-stream-path').textContent = `dogcam/${setupState.selectedDevice.id}`;
             document.getElementById('summary-config-path').textContent = data.path || './config.yaml';
             
-            setTimeout(() => {
-                nextStep();
-            }, 500);
+            showAlert(4, 'success', '✅ 配置已保存！客户端将自动检测输入源并开始推流。');
+            
+            // Change button to go to management interface
+            setButtonLoading('btn-finish', false, '进入管理界面');
+            document.getElementById('btn-finish').onclick = () => {
+                window.location.href = '/';
+            };
         } else {
             showAlert(4, 'error', `❌ 保存失败: ${data.message || '未知错误'}`);
+            setButtonLoading('btn-finish', false, '完成并开始推流');
         }
     } catch (error) {
         console.error('[Setup] Save config error:', error);
         showAlert(4, 'error', `❌ 保存失败: ${error.message}`);
-    } finally {
-        setButtonLoading('btn-finish', false, '完成配置');
+        setButtonLoading('btn-finish', false, '完成并开始推流');
     }
 }
 
-// ==================== Engine and Preset Functions ====================
 
-// Load available engines
-async function loadEngines() {
-    try {
-        const response = await fetch('/api/engines/available');
-        const data = await response.json();
-        setupState.engines = data.engines || [];
-        
-        displayEngines();
-    } catch (error) {
-        console.error('[Setup] Load engines error:', error);
-        showAlert(5, 'error', `❌ 加载引擎列表失败: ${error.message}`);
-    }
-}
-
-// Load available presets
-async function loadPresets() {
-    try {
-        const response = await fetch('/api/presets');
-        const data = await response.json();
-        setupState.presets = data.presets || [];
-        
-        displayPresets();
-    } catch (error) {
-        console.error('[Setup] Load presets error:', error);
-        showAlert(5, 'error', `❌ 加载预设列表失败: ${error.message}`);
-    }
-}
-
-// Display engines
-function displayEngines() {
-    const container = document.getElementById('engines-list');
-    container.innerHTML = '';
-    
-    setupState.engines.forEach(engine => {
-        const card = document.createElement('div');
-        card.className = `engine-card ${engine.available ? '' : 'unavailable'} ${engine.name === setupState.selectedEngine ? 'selected' : ''}`;
-        
-        if (engine.available) {
-            card.onclick = () => selectEngine(engine.name);
-        }
-        
-        card.innerHTML = `
-            <div class="engine-header">
-                <div class="engine-name">${engine.displayName}</div>
-                <div class="engine-badge ${engine.available ? 'badge-available' : 'badge-unavailable'}">
-                    ${engine.available ? '✓ 可用' : '✗ 不可用'}
-                </div>
-            </div>
-            <div class="engine-description">${engine.description}</div>
-            <div class="engine-features" style="margin-top: 0.5rem;">
-                ${engine.features.map(f => `<span style="font-size: 0.875rem; color: var(--text-secondary);">• ${f}</span>`).join('<br>')}
-            </div>
-            ${!engine.available && engine.installCommand ? `
-                <div style="margin-top: 0.5rem; padding: 0.5rem; background: var(--warning-bg); border-radius: 4px; font-size: 0.875rem;">
-                    <strong>安装命令:</strong><br>
-                    <code style="display: block; margin-top: 0.25rem;">${engine.installCommand}</code>
-                </div>
-            ` : ''}
-        `;
-        
-        container.appendChild(card);
-    });
-}
-
-// Display presets
-function displayPresets() {
-    const container = document.getElementById('presets-list');
-    container.innerHTML = '';
-    
-    // Add "No preset" option
-    const noPresetCard = document.createElement('div');
-    noPresetCard.className = `preset-card ${!setupState.selectedPreset ? 'selected' : ''}`;
-    noPresetCard.onclick = () => selectPreset(null);
-    noPresetCard.innerHTML = `
-        <div class="preset-header">
-            <div class="preset-name">⚙️ 自定义配置</div>
-        </div>
-        <div class="preset-description">不使用预设，手动配置所有参数</div>
-    `;
-    container.appendChild(noPresetCard);
-    
-    setupState.presets.forEach(preset => {
-        const card = document.createElement('div');
-        card.className = `preset-card ${preset.id === setupState.selectedPreset ? 'selected' : ''}`;
-        card.onclick = () => selectPreset(preset.id);
-        
-        card.innerHTML = `
-            <div class="preset-header">
-                <div style="display: flex; align-items: center;">
-                    <span class="preset-icon">${preset.icon}</span>
-                    <div>
-                        <div class="preset-name">${preset.name}</div>
-                        <div style="font-size: 0.875rem; color: var(--text-secondary);">${preset.description}</div>
-                    </div>
-                </div>
-                ${preset.id === 'low-latency' ? '<div class="engine-badge badge-recommended">推荐</div>' : ''}
-            </div>
-            <div class="preset-meta">
-                <div class="preset-meta-item">📡 引擎: ${preset.engine}</div>
-                <div class="preset-meta-item">⏱️ 延迟: ${preset.latency}</div>
-                <div class="preset-meta-item">🎨 质量: ${preset.quality}</div>
-                <div class="preset-meta-item">💻 资源: ${preset.resource}</div>
-            </div>
-            <div style="margin-top: 0.5rem; font-size: 0.875rem; color: var(--text-secondary);">
-                适用场景: ${preset.scenario}
-            </div>
-        `;
-        
-        container.appendChild(card);
-    });
-}
-
-// Select engine
-function selectEngine(engineName) {
-    setupState.selectedEngine = engineName;
-    displayEngines();
-    updateEngineConfig();
-}
-
-// Select preset
-function selectPreset(presetId) {
-    setupState.selectedPreset = presetId;
-    displayPresets();
-    
-    // If preset selected, update engine selection
-    if (presetId) {
-        const preset = setupState.presets.find(p => p.id === presetId);
-        if (preset) {
-            setupState.selectedEngine = preset.engine;
-            displayEngines();
-        }
-    }
-}
-
-// Update engine configuration panel visibility
-function updateEngineConfig() {
-    const ffmpegConfig = document.getElementById('ffmpeg-config');
-    const gstreamerConfig = document.getElementById('gstreamer-config');
-    
-    if (setupState.selectedEngine === 'ffmpeg') {
-        ffmpegConfig.classList.remove('hidden');
-        gstreamerConfig.classList.add('hidden');
-    } else if (setupState.selectedEngine === 'gstreamer') {
-        ffmpegConfig.classList.add('hidden');
-        gstreamerConfig.classList.remove('hidden');
-    }
-}
-
-// Override nextStep for step 4 to load engines and presets
-const originalNextStep = nextStep;
-nextStep = function() {
-    if (setupState.currentStep === 4) {
-        // Load engines and presets when entering step 5
-        loadEngines();
-        loadPresets();
-    }
-    originalNextStep();
-};
+// ==================== Keyboard Shortcuts ====================
 
 // Keyboard shortcuts
 document.addEventListener('keydown', (e) => {
@@ -637,7 +394,6 @@ document.addEventListener('keydown', (e) => {
         if (step === 1) validateServer();
         else if (step === 2) login();
         else if (step === 3) selectOrCreateDevice();
-        else if (step === 4) nextStep(); // Changed from saveAndFinish
-        else if (step === 5) saveAndFinish();
+        else if (step === 4) saveAndFinish();
     }
 });
