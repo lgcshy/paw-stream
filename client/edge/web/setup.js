@@ -73,6 +73,10 @@ function clearAlert(stepNum) {
 
 function setButtonLoading(buttonId, loading, text = '') {
     const btn = document.getElementById(buttonId);
+    if (!btn) {
+        console.warn(`[Setup] Button with id "${buttonId}" not found`);
+        return;
+    }
     if (loading) {
         btn.disabled = true;
         btn.innerHTML = `<span class="spinner"></span> ${text || '处理中...'}`;
