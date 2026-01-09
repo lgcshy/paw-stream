@@ -196,11 +196,14 @@ func (h *Handler) ValidateAPIServer(c *fiber.Ctx) error {
 	}
 
 	if err := c.BodyParser(&req); err != nil {
+		h.logger.Error().Err(err).Msg("Failed to parse validate-server request")
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error":   true,
 			"message": "Invalid request body",
 		})
 	}
+
+	h.logger.Info().Str("url", req.URL).Msg("Validating API server")
 
 	// Try to connect to API server
 	client := &http.Client{Timeout: 5 * time.Second}
@@ -241,6 +244,7 @@ func (h *Handler) Login(c *fiber.Ctx) error {
 	}
 
 	if err := c.BodyParser(&credentials); err != nil {
+		h.logger.Error().Err(err).Msg("Failed to parse login credentials")
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error":   true,
 			"message": "Invalid request body",
@@ -252,10 +256,16 @@ func (h *Handler) Login(c *fiber.Ctx) error {
 	apiURL := h.apiURL
 	h.mu.RUnlock()
 
+	h.logger.Debug().
+		Str("api_url", apiURL).
+		Str("username", credentials.Username).
+		Msg("Login request received")
+
 	if apiURL == "" {
+		h.logger.Warn().Msg("Login attempted without API URL configured")
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error":   true,
-			"message": "API server URL not configured. Please validate API server first.",
+			"message": "API server URL not configured. Please validate API server first (Step 1).",
 		})
 	}
 
