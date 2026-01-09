@@ -134,10 +134,14 @@ func (h *Handler) SaveConfig(c *fiber.Ctx) error {
 		})
 	}
 
-	// Create backup
-	backupPath := h.configPath + ".backup." + time.Now().Format("20060102-150405")
-	if err := copyFile(h.configPath, backupPath); err != nil {
-		h.logger.Warn().Err(err).Msg("Failed to create config backup")
+	// Create backup if config file exists
+	if _, err := os.Stat(h.configPath); err == nil {
+		backupPath := h.configPath + ".backup." + time.Now().Format("20060102-150405")
+		if err := copyFile(h.configPath, backupPath); err != nil {
+			h.logger.Warn().Err(err).Msg("Failed to create config backup")
+		} else {
+			h.logger.Info().Str("backup", backupPath).Msg("Config backup created")
+		}
 	}
 
 	// Write new config
