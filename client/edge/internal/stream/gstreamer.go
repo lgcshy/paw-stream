@@ -90,9 +90,12 @@ func (g *GStreamerEngine) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to build pipeline: %w", err)
 	}
 
-	// Create command - gst-launch-1.0 expects each element and ! as separate arguments
-	args := append([]string{"-q"}, pipeline...)  // -q for quiet mode (less debug output)
-	g.cmd = exec.CommandContext(g.ctx, "gst-launch-1.0", args...)
+	// Join pipeline elements into a command string
+	pipelineStr := strings.Join(pipeline, " ")
+	
+	// Use shell to execute the command, which properly handles quotes and special characters
+	cmdStr := fmt.Sprintf("gst-launch-1.0 -q %s", pipelineStr)
+	g.cmd = exec.CommandContext(g.ctx, "sh", "-c", cmdStr)
 
 	// Capture stdout and stderr
 	stdout, err := g.cmd.StdoutPipe()
