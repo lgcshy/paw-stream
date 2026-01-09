@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -507,10 +508,13 @@ func runClientWithOverrides(configFile string, overrides *configOverrides) {
 	log.Info().Str("source", inputSource.String()).Msg("Input source configured")
 
 	// Build output RTSP URL with authentication
+	// Extract host:port from cfg.Stream.URL (e.g., "rtsp://localhost:8554" -> "localhost:8554")
+	streamHost := strings.TrimPrefix(cfg.Stream.URL, "rtsp://")
+	streamHost = strings.TrimPrefix(streamHost, "rtmps://")
 	outputURL := fmt.Sprintf("rtsp://%s:%s@%s/%s",
 		cfg.Device.ID,
 		cfg.Device.Secret,
-		cfg.Stream.URL,
+		streamHost,
 		deviceInfo.PublishPath)
 
 	// Create stream manager
