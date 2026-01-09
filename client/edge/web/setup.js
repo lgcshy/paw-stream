@@ -261,16 +261,16 @@ async function selectOrCreateDevice() {
         
         const data = await response.json();
         
-        if (response.ok && data.id) {
+        if (response.ok && data.device && data.device.id) {
             setupState.selectedDevice = {
-                id: data.id,
-                name: data.name || deviceName,
-                location: deviceLocation,
+                id: data.device.id,
+                name: data.device.name || deviceName,
+                location: data.device.location || deviceLocation,
                 secret: data.secret,
-                publish_path: data.publish_path
+                publish_path: data.device.publish_path
             };
             
-            showAlert(3, 'success', `✅ 设备创建成功: ${data.name}`);
+            showAlert(3, 'success', `✅ 设备创建成功: ${data.device.name}`);
             
             setTimeout(() => {
                 nextStep();
