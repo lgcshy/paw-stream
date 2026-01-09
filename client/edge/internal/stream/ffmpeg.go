@@ -11,8 +11,8 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// FFmpegManager manages an FFmpeg process for streaming
-type FFmpegManager struct {
+// FFmpegEngine implements StreamEngine interface using FFmpeg
+type FFmpegEngine struct {
 	cmd        *exec.Cmd
 	inputArgs  []string
 	outputArgs []string
@@ -25,21 +25,33 @@ type FFmpegManager struct {
 	mu      sync.Mutex
 	errorCh chan error
 	doneCh  chan struct{}
+	
+	// Stats
+	stats EngineStats
 }
 
-// NewFFmpegManager creates a new FFmpeg manager
-func NewFFmpegManager(inputArgs, outputArgs []string, logger zerolog.Logger) *FFmpegManager {
-	return &FFmpegManager{
+// NewFFmpegEngine creates a new FFmpeg engine
+func NewFFmpegEngine(inputArgs, outputArgs []string, logger zerolog.Logger) *FFmpegEngine {
+	return &FFmpegEngine{
 		inputArgs:  inputArgs,
 		outputArgs: outputArgs,
-		logger:     logger.With().Str("component", "ffmpeg").Logger(),
+		logger:     logger.With().Str("component", "ffmpeg").Str("engine", "ffmpeg").Logger(),
 		errorCh:    make(chan error, 1),
 		doneCh:     make(chan struct{}),
+		stats: EngineStats{
+			Encoder: "libx264", // Default, will be detected
+		},
 	}
 }
 
+// NewFFmpegManager is deprecated, use NewFFmpegEngine instead
+// Kept for backward compatibility
+func NewFFmpegManager(inputArgs, outputArgs []string, logger zerolog.Logger) *FFmpegEngine {
+	return NewFFmpegEngine(inputArgs, outputArgs, logger)
+}
+
 // Start starts the FFmpeg process
-func (m *FFmpegManager) Start(ctx context.Context) error {
+func (m *FFmpegEngine) Start(ctx context.Context) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -119,7 +131,7 @@ func (m *FFmpegManager) Start(ctx context.Context) error {
 }
 
 // Stop stops the FFmpeg process gracefully
-func (m *FFmpegManager) Stop() error {
+func (m *FFmpegEngine) Stop() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -142,17 +154,29 @@ func (m *FFmpegManager) Stop() error {
 }
 
 // Wait waits for the FFmpeg process to exit
-func (m *FFmpegManager) Wait() error {
+func (m *FFmpegEngine) Wait() error {
 	<-m.doneCh
 	return nil
 }
 
 // IsRunning returns whether the FFmpeg process is running
-func (m *FFmpegManager) IsRunning() bool {
+func (m *FFmpegEngine) IsRunning() bool {
 	return m.running.Load()
 }
 
 // ErrorCh returns the error channel
-func (m *FFmpegManager) ErrorCh() <-chan error {
+func (m *FFmpegEngine) ErrorCh() <-chan error {
 	return m.errorCh
+}
+
+// Name returns the engine name
+func (m *FFmpegEngine) Name() string {
+	return "ffmpeg"
+}
+
+// Stats returns the current engine statistics
+func (m *FFmpegEngine) Stats() EngineStats {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.stats
 }

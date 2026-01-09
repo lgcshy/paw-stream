@@ -37,7 +37,7 @@ type Manager struct {
 	config Config
 	logger zerolog.Logger
 
-	ffmpeg         *FFmpegManager
+	engine         StreamEngine
 	ctx            context.Context
 	cancel         context.CancelFunc
 	mu             sync.RWMutex
@@ -75,11 +75,11 @@ func (m *Manager) Start(ctx context.Context) error {
 	inputArgs := m.input.FFmpegArgs()
 	outputArgs := m.buildOutputArgs()
 
-	// Create FFmpeg manager
-	m.ffmpeg = NewFFmpegManager(inputArgs, outputArgs, m.logger)
+	// Create stream engine (default to FFmpeg for now)
+	m.engine = NewFFmpegEngine(inputArgs, outputArgs, m.logger)
 
-	// Start FFmpeg
-	if err := m.ffmpeg.Start(m.ctx); err != nil {
+	// Start engine
+	if err := m.engine.Start(m.ctx); err != nil {
 		m.state = "error"
 		m.lastError = err.Error()
 		m.errorCount.Add(1)
@@ -90,10 +90,11 @@ func (m *Manager) Start(ctx context.Context) error {
 	m.logger.Info().
 		Str("input", m.input.String()).
 		Str("output", m.output).
+		Str("engine", m.engine.Name()).
 		Msg("Streaming started")
 
-	// Monitor FFmpeg process
-	go m.monitorFFmpeg()
+	// Monitor engine process
+	go m.monitorEngine()
 
 	return nil
 }
@@ -114,10 +115,10 @@ func (m *Manager) Stop() error {
 		m.cancel()
 	}
 
-	// Stop FFmpeg
-	if m.ffmpeg != nil {
-		if err := m.ffmpeg.Stop(); err != nil {
-			m.logger.Error().Err(err).Msg("Failed to stop FFmpeg")
+	// Stop engine
+	if m.engine != nil {
+		if err := m.engine.Stop(); err != nil {
+			m.logger.Error().Err(err).Str("engine", m.engine.Name()).Msg("Failed to stop engine")
 		}
 	}
 
@@ -148,19 +149,19 @@ func (m *Manager) IsRunning() bool {
 	return m.state == "streaming"
 }
 
-// monitorFFmpeg monitors the FFmpeg process and handles errors
-func (m *Manager) monitorFFmpeg() {
+// monitorEngine monitors the stream engine process and handles errors
+func (m *Manager) monitorEngine() {
 	for {
 		select {
 		case <-m.ctx.Done():
 			return
-		case err := <-m.ffmpeg.ErrorCh():
+		case err := <-m.engine.ErrorCh():
 			m.handleError(err)
 		}
 	}
 }
 
-// handleError handles FFmpeg errors and implements reconnect logic
+// handleError handles stream engine errors and implements reconnect logic
 func (m *Manager) handleError(err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -168,7 +169,12 @@ func (m *Manager) handleError(err error) {
 	m.errorCount.Add(1)
 	m.lastError = err.Error()
 
-	m.logger.Error().Err(err).Msg("FFmpeg error occurred")
+	engineName := "unknown"
+	if m.engine != nil {
+		engineName = m.engine.Name()
+	}
+
+	m.logger.Error().Err(err).Str("engine", engineName).Msg("Stream engine error occurred")
 
 	// Check if we should reconnect
 	currentCount := m.reconnectCount.Add(1)
@@ -190,12 +196,12 @@ func (m *Manager) handleError(err error) {
 	// Wait before reconnecting
 	time.Sleep(m.config.ReconnectInterval)
 
-	// Attempt to restart
+	// Attempt to restart with same engine type
 	inputArgs := m.input.FFmpegArgs()
 	outputArgs := m.buildOutputArgs()
-	m.ffmpeg = NewFFmpegManager(inputArgs, outputArgs, m.logger)
+	m.engine = NewFFmpegEngine(inputArgs, outputArgs, m.logger)
 
-	if err := m.ffmpeg.Start(m.ctx); err != nil {
+	if err := m.engine.Start(m.ctx); err != nil {
 		m.logger.Error().Err(err).Msg("Failed to reconnect")
 		// Will retry on next error
 		return

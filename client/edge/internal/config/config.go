@@ -52,9 +52,28 @@ type VideoConfig struct {
 
 // StreamConfig holds streaming configuration
 type StreamConfig struct {
-	URL                   string        `yaml:"url"`
-	ReconnectInterval     time.Duration `yaml:"reconnect_interval"`
-	MaxReconnectAttempts  int           `yaml:"max_reconnect_attempts"`
+	Engine               string            `yaml:"engine"` // ffmpeg, gstreamer
+	Preset               string            `yaml:"preset"` // low-latency, high-quality, balanced, power-save
+	URL                  string            `yaml:"url"`
+	ReconnectInterval    time.Duration     `yaml:"reconnect_interval"`
+	MaxReconnectAttempts int               `yaml:"max_reconnect_attempts"`
+	FFmpeg               FFmpegConfig      `yaml:"ffmpeg"`
+	GStreamer            GStreamerConfig   `yaml:"gstreamer"`
+}
+
+// FFmpegConfig holds FFmpeg-specific configuration
+type FFmpegConfig struct {
+	Preset    string   `yaml:"preset"`     // ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow
+	Tune      string   `yaml:"tune"`       // film, animation, grain, stillimage, fastdecode, zerolatency
+	HWAccel   string   `yaml:"hwaccel"`    // none, auto, vaapi, nvenc, qsv, videotoolbox
+	ExtraArgs []string `yaml:"extra_args"` // Custom FFmpeg arguments
+}
+
+// GStreamerConfig holds GStreamer-specific configuration
+type GStreamerConfig struct {
+	LatencyMs   int  `yaml:"latency_ms"`   // Pipeline latency in milliseconds
+	UseHardware bool `yaml:"use_hardware"` // Use hardware encoders
+	BufferSize  int  `yaml:"buffer_size"`  // Buffer size in microseconds
 }
 
 // LogConfig holds logging configuration
@@ -101,8 +120,21 @@ func Load(filePath string) (*Config, error) {
 			Bitrate:   2000000,
 		},
 		Stream: StreamConfig{
+			Engine:               "ffmpeg", // Default to FFmpeg for compatibility
+			Preset:               "",       // No preset by default
 			ReconnectInterval:    5 * time.Second,
 			MaxReconnectAttempts: 0, // infinite
+			FFmpeg: FFmpegConfig{
+				Preset:    "ultrafast",
+				Tune:      "zerolatency",
+				HWAccel:   "auto",
+				ExtraArgs: []string{},
+			},
+			GStreamer: GStreamerConfig{
+				LatencyMs:   100,
+				UseHardware: true,
+				BufferSize:  1000,
+			},
 		},
 		Log: LogConfig{
 			Level:  "info",
@@ -137,6 +169,13 @@ func Load(filePath string) (*Config, error) {
 	// Override with environment variables
 	cfg.applyEnvOverrides()
 
+	// Apply preset if specified
+	if cfg.Stream.Preset != "" {
+		if err := cfg.ApplyPreset(cfg.Stream.Preset); err != nil {
+			return nil, fmt.Errorf("failed to apply preset: %w", err)
+		}
+	}
+
 	// Validate configuration
 	if err := cfg.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid configuration: %w", err)
@@ -167,6 +206,12 @@ func (c *Config) applyEnvOverrides() {
 	}
 	if v := os.Getenv("PAWSTREAM_LOG_FILE"); v != "" {
 		c.Log.File = v
+	}
+	if v := os.Getenv("PAWSTREAM_STREAM_ENGINE"); v != "" {
+		c.Stream.Engine = v
+	}
+	if v := os.Getenv("PAWSTREAM_STREAM_PRESET"); v != "" {
+		c.Stream.Preset = v
 	}
 }
 
