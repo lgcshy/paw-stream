@@ -542,11 +542,30 @@ func runClientWithOverrides(configFile string, overrides *configOverrides) {
 
 	log.Info().Str("source", inputSource.String()).Msg("Input source configured")
 
-	// Build output RTSP URL with authentication
-	// Extract host:port from cfg.Stream.URL (e.g., "rtsp://localhost:8554" -> "localhost:8554")
-	streamHost := strings.TrimPrefix(cfg.Stream.URL, "rtsp://")
-	streamHost = strings.TrimPrefix(streamHost, "rtmps://")
-	outputURL := fmt.Sprintf("rtsp://%s:%s@%s/%s",
+	// Build output URL with authentication
+	// Detect protocol and extract host:port
+	var protocol, streamHost string
+	switch {
+	case strings.HasPrefix(cfg.Stream.URL, "rtsp://"):
+		protocol = "rtsp"
+		streamHost = strings.TrimPrefix(cfg.Stream.URL, "rtsp://")
+	case strings.HasPrefix(cfg.Stream.URL, "rtsps://"):
+		protocol = "rtsps"
+		streamHost = strings.TrimPrefix(cfg.Stream.URL, "rtsps://")
+	case strings.HasPrefix(cfg.Stream.URL, "rtmp://"):
+		protocol = "rtmp"
+		streamHost = strings.TrimPrefix(cfg.Stream.URL, "rtmp://")
+	case strings.HasPrefix(cfg.Stream.URL, "rtmps://"):
+		protocol = "rtmps"
+		streamHost = strings.TrimPrefix(cfg.Stream.URL, "rtmps://")
+	default:
+		// No protocol specified, assume rtsp and use as-is
+		protocol = "rtsp"
+		streamHost = cfg.Stream.URL
+	}
+	
+	outputURL := fmt.Sprintf("%s://%s:%s@%s/%s",
+		protocol,
 		cfg.Device.ID,
 		cfg.Device.Secret,
 		streamHost,

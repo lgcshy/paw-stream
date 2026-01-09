@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -100,12 +101,19 @@ func (m *FFmpegEngine) Start(ctx context.Context) error {
 		}
 	}()
 
+	// Buffer to capture stderr for error reporting
+	var stderrBuf strings.Builder
+
 	// Monitor stderr (FFmpeg outputs logs to stderr)
 	go func() {
 		scanner := bufio.NewScanner(stderr)
 		for scanner.Scan() {
 			line := scanner.Text()
 			m.logger.Debug().Str("stderr", line).Msg("FFmpeg log")
+			
+			// Buffer stderr for error reporting
+			stderrBuf.WriteString(line)
+			stderrBuf.WriteString("\n")
 		}
 	}()
 
@@ -115,7 +123,22 @@ func (m *FFmpegEngine) Start(ctx context.Context) error {
 		m.running.Store(false)
 
 		if err != nil {
-			m.logger.Error().Err(err).Msg("FFmpeg process exited with error")
+			// Log FFmpeg stderr output on error
+			if stderrOutput := stderrBuf.String(); stderrOutput != "" {
+				// Get last 50 lines of stderr
+				lines := strings.Split(strings.TrimSpace(stderrOutput), "\n")
+				if len(lines) > 50 {
+					lines = lines[len(lines)-50:]
+				}
+				lastOutput := strings.Join(lines, "\n")
+				
+				m.logger.Error().
+					Err(err).
+					Str("ffmpeg_output", lastOutput).
+					Msg("FFmpeg process exited with error")
+			} else {
+				m.logger.Error().Err(err).Msg("FFmpeg process exited with error")
+			}
 			select {
 			case m.errorCh <- err:
 			default:

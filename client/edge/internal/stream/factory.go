@@ -57,13 +57,27 @@ func NewStreamEngine(config EngineConfig, logger zerolog.Logger) (StreamEngine, 
 func newFFmpegEngineFromConfig(config EngineConfig, logger zerolog.Logger) *FFmpegEngine {
 	inputArgs := config.Input.FFmpegArgs()
 	
+	// Detect output protocol and set appropriate format
+	outputFormat := "rtsp"
+	var protocolArgs []string
+	
+	if strings.HasPrefix(config.Output, "rtmp://") || strings.HasPrefix(config.Output, "rtmps://") {
+		outputFormat = "flv"
+	} else if strings.HasPrefix(config.Output, "rtsp://") || strings.HasPrefix(config.Output, "rtsps://") {
+		outputFormat = "rtsp"
+		protocolArgs = []string{"-rtsp_transport", "tcp"}
+	}
+	
 	outputArgs := []string{
 		"-c:v", config.VideoCodec,
 		"-preset", config.FFmpegPreset,
 		"-tune", config.FFmpegTune,
 		"-b:v", fmt.Sprintf("%d", config.VideoBitrate),
-		"-f", "rtsp",
 	}
+	
+	// Add protocol-specific args
+	outputArgs = append(outputArgs, protocolArgs...)
+	outputArgs = append(outputArgs, "-f", outputFormat)
 	
 	// Add hardware acceleration if specified
 	if config.FFmpegHWAccel != "none" && config.FFmpegHWAccel != "" {
