@@ -25,6 +25,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (savedAPIURL) {
         document.getElementById('api-url').value = savedAPIURL;
     }
+    
+    // Setup device form listeners
+    setupDeviceFormListeners();
 });
 
 // Step navigation
@@ -169,6 +172,31 @@ async function login() {
     }
 }
 
+// Step 3: Setup device form listeners to deselect existing device when creating new one
+function setupDeviceFormListeners() {
+    const deviceNameInput = document.getElementById('device-name');
+    const deviceLocationInput = document.getElementById('device-location');
+    
+    if (!deviceNameInput || !deviceLocationInput) return;
+    
+    const clearSelection = () => {
+        // Deselect all devices
+        document.querySelectorAll('.device-item').forEach(el => {
+            el.classList.remove('selected');
+        });
+        setupState.selectedDevice = null;
+        // Hide secret input
+        const secretContainer = document.getElementById('device-secret-container');
+        if (secretContainer) {
+            secretContainer.classList.add('hidden');
+        }
+        document.getElementById('device-secret').value = '';
+    };
+    
+    deviceNameInput.addEventListener('focus', clearSelection);
+    deviceLocationInput.addEventListener('focus', clearSelection);
+}
+
 // Step 3: Load devices
 async function loadDevices() {
     try {
@@ -221,6 +249,8 @@ function renderDeviceList() {
             // Select this one
             item.classList.add('selected');
             setupState.selectedDevice = device;
+            // Show secret input when selecting existing device
+            document.getElementById('device-secret-container').classList.remove('hidden');
             console.log('[Setup] Selected device:', device.id);
         });
         
@@ -234,11 +264,24 @@ async function selectOrCreateDevice() {
     
     // If user selected existing device
     if (setupState.selectedDevice) {
-        showAlert(3, 'info', '⚠️ 使用现有设备将需要您提供设备密钥（secret）。是否继续？');
+        const deviceSecret = document.getElementById('device-secret').value.trim();
         
-        // For existing device, we need to prompt for secret
-        // For simplicity, we'll skip this and require creating a new device
-        showAlert(3, 'error', '暂不支持使用现有设备，请创建新设备');
+        if (!deviceSecret) {
+            showAlert(3, 'error', '请输入设备密钥（secret）');
+            return;
+        }
+        
+        // Add secret to the selected device
+        setupState.selectedDevice.secret = deviceSecret;
+        
+        clearAlert(3);
+        showAlert(3, 'success', `✅ 已选择设备: ${setupState.selectedDevice.name}`);
+        
+        setTimeout(() => {
+            nextStep();
+            clearAlert(3);
+            detectSources();
+        }, 1000);
         return;
     }
     

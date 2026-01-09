@@ -528,9 +528,17 @@
             <div id="device-list-container" class="hidden">
                 <h3>现有设备</h3>
                 <div class="device-list" id="device-list"></div>
+                
+                <div id="device-secret-container" class="hidden" style="margin-top: 1rem;">
+                    <div class="form-group">
+                        <label for="device-secret">设备密钥 (Secret)</label>
+                        <input type="password" id="device-secret" placeholder="请输入设备密钥">
+                        <small>使用现有设备需要提供设备密钥（创建设备时显示的 secret）</small>
+                    </div>
+                </div>
             </div>
 
-            <h3>创建新设备</h3>
+            <h3>或者创建新设备</h3>
             <div class="form-group">
                 <label for="device-name">设备名称</label>
                 <input type="text" id="device-name" placeholder="例如: 客厅摄像头">
