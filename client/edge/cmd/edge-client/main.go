@@ -350,6 +350,7 @@ func runClientWithOverrides(configFile string, overrides *configOverrides) {
 	}
 
 	// Auto-detect input source if needed
+	configModified := false
 	if cfg.Input.Type == "auto" || cfg.Input.Source == "auto" {
 		fmt.Printf("🔍 Auto-detecting input source...\n")
 		detectedType, detectedSource, err := input.AutoDetectInput()
@@ -363,12 +364,23 @@ func runClientWithOverrides(configFile string, overrides *configOverrides) {
 			cfg.Input.Source = detectedSource
 			fmt.Printf("✅ Detected: %s -> %s\n", detectedType, detectedSource)
 		}
+		configModified = true
 	}
 
 	// Default to GStreamer if engine not specified
 	if cfg.Stream.Engine == "" {
 		cfg.Stream.Engine = "gstreamer"
 		fmt.Printf("🎬 Using default engine: gstreamer\n")
+		configModified = true
+	}
+
+	// Save updated configuration if modified
+	if configModified {
+		if err := config.Save(configFile, cfg); err != nil {
+			fmt.Fprintf(os.Stderr, "⚠️  Warning: Failed to save updated configuration: %v\n", err)
+		} else {
+			fmt.Printf("💾 Configuration updated and saved\n")
+		}
 	}
 
 	// Check configuration completeness (after applying overrides)

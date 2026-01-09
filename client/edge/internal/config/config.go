@@ -184,6 +184,27 @@ func Load(filePath string) (*Config, error) {
 	return cfg, nil
 }
 
+// Save writes the configuration to a file
+func Save(path string, cfg *Config) error {
+	data, err := yaml.Marshal(cfg)
+	if err != nil {
+		return fmt.Errorf("failed to marshal config: %w", err)
+	}
+
+	// Create directory if it doesn't exist
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("failed to create config directory: %w", err)
+	}
+
+	// Write file
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		return fmt.Errorf("failed to write config file: %w", err)
+	}
+
+	return nil
+}
+
 // applyEnvOverrides applies environment variable overrides
 func (c *Config) applyEnvOverrides() {
 	if v := os.Getenv("PAWSTREAM_DEVICE_ID"); v != "" {
@@ -236,11 +257,13 @@ func (c *Config) Validate() error {
 		"rtsp": true,
 		"file": true,
 		"test": true,
+		"auto": true, // Allow auto for zero-config startup
 	}
 	if !validInputTypes[c.Input.Type] {
-		return fmt.Errorf("input.type must be one of: v4l2, rtsp, file, test")
+		return fmt.Errorf("input.type must be one of: v4l2, rtsp, file, test, auto")
 	}
-	if c.Input.Type != "test" && c.Input.Source == "" {
+	// Source validation - not required for 'test' and 'auto' types
+	if c.Input.Type != "test" && c.Input.Type != "auto" && c.Input.Source == "" {
 		return fmt.Errorf("input.source is required for input type: %s", c.Input.Type)
 	}
 
