@@ -202,11 +202,46 @@ func (g *GStreamerEngine) buildSoftwareEncoder() ([]string, error) {
 
 // buildOutputElements builds pipeline elements for RTSP output
 func (g *GStreamerEngine) buildOutputElements() []string {
+	// Extract auth from URL: rtsp://user:pass@host:port/path
+	// rtspclientsink uses separate user-id and user-pw properties
+	location, userId, userPw := parseRTSPAuth(g.output)
+	
+	var sink string
+	if userId != "" && userPw != "" {
+		sink = fmt.Sprintf("rtspclientsink location=%s user-id=%s user-pw=%s latency=%d",
+			location, userId, userPw, g.config.LatencyMs)
+	} else {
+		sink = fmt.Sprintf("rtspclientsink location=%s latency=%d",
+			location, g.config.LatencyMs)
+	}
+	
 	return []string{
 		"rtph264pay config-interval=1 pt=96",
-		fmt.Sprintf("rtspclientsink location=%s latency=%d",
-			g.output, g.config.LatencyMs),
+		sink,
 	}
+}
+
+// parseRTSPAuth extracts authentication from RTSP URL
+// Input: rtsp://user:pass@host:port/path
+// Output: rtsp://host:port/path, user, pass
+func parseRTSPAuth(rtspURL string) (location, userId, userPw string) {
+	url := strings.TrimPrefix(rtspURL, "rtsp://")
+	
+	// Check if auth is present
+	if idx := strings.Index(url, "@"); idx >= 0 {
+		auth := url[:idx]
+		url = url[idx+1:]
+		
+		// Split user:pass
+		parts := strings.SplitN(auth, ":", 2)
+		if len(parts) == 2 {
+			userId = parts[0]
+			userPw = parts[1]
+		}
+	}
+	
+	location = "rtsp://" + url
+	return
 }
 
 // isGStreamerElementAvailable checks if a GStreamer element is available
