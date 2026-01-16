@@ -23,10 +23,10 @@ type FFmpegEngine struct {
 
 	// State
 	running atomic.Bool
-	mu      sync.Mutex
+	mu      sync.RWMutex
 	errorCh chan error
 	doneCh  chan struct{}
-	
+
 	// Stats
 	stats EngineStats
 }
@@ -110,7 +110,7 @@ func (m *FFmpegEngine) Start(ctx context.Context) error {
 		for scanner.Scan() {
 			line := scanner.Text()
 			m.logger.Debug().Str("stderr", line).Msg("FFmpeg log")
-			
+
 			// Buffer stderr for error reporting
 			stderrBuf.WriteString(line)
 			stderrBuf.WriteString("\n")
@@ -131,7 +131,7 @@ func (m *FFmpegEngine) Start(ctx context.Context) error {
 					lines = lines[len(lines)-50:]
 				}
 				lastOutput := strings.Join(lines, "\n")
-				
+
 				m.logger.Error().
 					Err(err).
 					Str("ffmpeg_output", lastOutput).
@@ -199,7 +199,7 @@ func (m *FFmpegEngine) Name() string {
 
 // Stats returns the current engine statistics
 func (m *FFmpegEngine) Stats() EngineStats {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	return m.stats
 }

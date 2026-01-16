@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -120,26 +121,26 @@ func versionCommand() {
 
 func startCommand() {
 	fs := flag.NewFlagSet("start", flag.ExitOnError)
-	
+
 	// File and mode options
 	configFile := fs.String("config", "", "path to config file (optional, will auto-search if not specified)")
 	daemonMode := fs.Bool("daemon", false, "run as daemon")
-	
+
 	// Core configuration overrides
 	deviceID := fs.String("device-id", "", "device ID (overrides config file)")
 	deviceSecret := fs.String("device-secret", "", "device secret (overrides config file)")
 	apiURL := fs.String("api-url", "", "API server URL (overrides config file)")
-	
+
 	// Input configuration overrides
 	inputType := fs.String("input-type", "", "input type: v4l2, rtsp, file, test (overrides config file)")
 	inputSource := fs.String("input-source", "", "input source path or URL (overrides config file)")
-	
+
 	// MediaMTX configuration
 	mediamtxURL := fs.String("mediamtx-url", "", "MediaMTX server URL (overrides config file)")
-	
+
 	// Other options
 	logLevel := fs.String("log-level", "", "log level: debug, info, warn, error")
-	
+
 	fs.Parse(os.Args[2:])
 
 	// Auto-search for config file if not specified
@@ -319,6 +320,9 @@ func runClientWithOverrides(configFile string, overrides *configOverrides) {
 		os.Exit(1)
 	}
 
+	// Mutex for thread-safe config access during hot reload
+	var cfgMu sync.RWMutex
+
 	// Apply command-line overrides (highest priority)
 	if overrides.deviceID != "" {
 		cfg.Device.ID = overrides.deviceID
@@ -475,7 +479,7 @@ func runClientWithOverrides(configFile string, overrides *configOverrides) {
 		go func() {
 			for range configWatcher.ReloadChan() {
 				log.Info().Msg("Configuration file changed, reloading...")
-				
+
 				// Reload config
 				newCfg, err := config.Load(configFile)
 				if err != nil {
@@ -484,7 +488,9 @@ func runClientWithOverrides(configFile string, overrides *configOverrides) {
 				}
 
 				// Update config (thread-safe)
+				cfgMu.Lock()
 				cfg = newCfg
+				cfgMu.Unlock()
 				log.Info().Msg("Configuration reloaded successfully")
 
 				// Notify SSE clients
@@ -563,7 +569,7 @@ func runClientWithOverrides(configFile string, overrides *configOverrides) {
 		protocol = "rtsp"
 		streamHost = cfg.Stream.URL
 	}
-	
+
 	outputURL := fmt.Sprintf("%s://%s:%s@%s/%s",
 		protocol,
 		cfg.Device.ID,
@@ -573,20 +579,20 @@ func runClientWithOverrides(configFile string, overrides *configOverrides) {
 
 	// Create stream manager
 	streamCfg := stream.Config{
-		Engine:                   stream.EngineType(cfg.Stream.Engine),
-		VideoCodec:               cfg.Video.Codec,
-		VideoBitrate:             cfg.Video.Bitrate,
-		VideoWidth:               cfg.Video.Width,
-		VideoHeight:              cfg.Video.Height,
-		VideoFramerate:           cfg.Video.Framerate,
-		FFmpegPreset:             cfg.Stream.FFmpeg.Preset,
-		FFmpegTune:               cfg.Stream.FFmpeg.Tune,
-		FFmpegHWAccel:            cfg.Stream.FFmpeg.HWAccel,
-		GStreamerLatencyMs:       cfg.Stream.GStreamer.LatencyMs,
-		GStreamerUseHardware:     cfg.Stream.GStreamer.UseHardware,
-		GStreamerBufferSize:      cfg.Stream.GStreamer.BufferSize,
-		ReconnectInterval:        cfg.Stream.ReconnectInterval,
-		MaxReconnectAttempts:     cfg.Stream.MaxReconnectAttempts,
+		Engine:               stream.EngineType(cfg.Stream.Engine),
+		VideoCodec:           cfg.Video.Codec,
+		VideoBitrate:         cfg.Video.Bitrate,
+		VideoWidth:           cfg.Video.Width,
+		VideoHeight:          cfg.Video.Height,
+		VideoFramerate:       cfg.Video.Framerate,
+		FFmpegPreset:         cfg.Stream.FFmpeg.Preset,
+		FFmpegTune:           cfg.Stream.FFmpeg.Tune,
+		FFmpegHWAccel:        cfg.Stream.FFmpeg.HWAccel,
+		GStreamerLatencyMs:   cfg.Stream.GStreamer.LatencyMs,
+		GStreamerUseHardware: cfg.Stream.GStreamer.UseHardware,
+		GStreamerBufferSize:  cfg.Stream.GStreamer.BufferSize,
+		ReconnectInterval:    cfg.Stream.ReconnectInterval,
+		MaxReconnectAttempts: cfg.Stream.MaxReconnectAttempts,
 	}
 
 	streamMgr := stream.NewManager(inputSource, outputURL, streamCfg, log.Logger)
