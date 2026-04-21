@@ -118,4 +118,4 @@ openspec/          Change proposals & specs
 
 ## License
 
-Private project.
+[MIT](LICENSE)
