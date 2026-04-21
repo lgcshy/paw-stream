@@ -1,5 +1,7 @@
 # PawStream
 
+[English](README.en.md) | 中文
+
 自托管的家庭宠物实时视频监控系统。
 
 多台边缘设备（树莓派 / 香橙派 + USB 摄像头）将视频推流至中心 [MediaMTX](https://github.com/bluenviron/mediamtx) 媒体服务器，用户通过移动端优先的 Web UI 以 WebRTC 实时观看画面。
