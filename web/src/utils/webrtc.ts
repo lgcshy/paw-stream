@@ -72,11 +72,14 @@ export class WebRTCPlayer {
       }
 
       // Send offer to MediaMTX
-      const response = await fetch(`${this.options.mediamtxURL}/${this.options.path}/whep`, {
+      // Pass JWT via query parameter to avoid CORS preflight issues with Authorization header
+      const whepURL = new URL(`${this.options.mediamtxURL}/${this.options.path}/whep`)
+      whepURL.searchParams.set('jwt', this.options.token)
+
+      const response = await fetch(whepURL.toString(), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/sdp',
-          'Authorization': `Bearer ${this.options.token}`,
         },
         body: this.pc.localDescription?.sdp,
       })

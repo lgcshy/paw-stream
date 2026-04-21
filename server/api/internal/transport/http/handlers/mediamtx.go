@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"net/url"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/rs/zerolog"
 
@@ -30,6 +32,7 @@ type AuthRequest struct {
 	User     string `json:"user"`
 	Password string `json:"password"`
 	Token    string `json:"token"`
+	Query    string `json:"query"`
 }
 
 // Auth handles POST /mediamtx/auth
@@ -43,6 +46,16 @@ func (h *MediaMTXHandler) Auth(c *fiber.Ctx) error {
 		})
 	}
 
+	// Extract JWT from query parameters if token field is empty
+	token := req.Token
+	if token == "" && req.Query != "" {
+		if params, err := url.ParseQuery(req.Query); err == nil {
+			if jwt := params.Get("jwt"); jwt != "" {
+				token = jwt
+			}
+		}
+	}
+
 	// Log auth attempt
 	h.log.Info().
 		Str("action", req.Action).
@@ -51,7 +64,8 @@ func (h *MediaMTXHandler) Auth(c *fiber.Ctx) error {
 		Str("ip", req.IP).
 		Str("user", req.User).
 		Str("password", req.Password).
-		Str("token", req.Token).
+		Str("token", token).
+		Str("query", req.Query).
 		Msg("mediamtx auth request")
 
 	// Convert to ACL request
@@ -62,7 +76,7 @@ func (h *MediaMTXHandler) Auth(c *fiber.Ctx) error {
 		IP:       req.IP,
 		User:     req.User,
 		Password: req.Password,
-		Token:    req.Token,
+		Token:    token,
 	}
 
 	// Check authorization
