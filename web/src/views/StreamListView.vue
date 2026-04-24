@@ -3,6 +3,7 @@ import { onMounted, computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { List, Cell, Tag, Empty, Loading, PullRefresh, Icon, showFailToast, showSuccessToast } from 'vant'
 import Layout from '@/components/Layout.vue'
+import StreamPreviewCard from '@/components/StreamPreviewCard.vue'
 import { useDeviceStore } from '@/stores/device'
 
 const VIEW_MODE_KEY = 'pawstream_view_mode'
@@ -90,25 +91,14 @@ const goToPlayer = (streamId: string) => {
           </Cell>
         </List>
 
-        <!-- 图片/卡片模式 -->
+        <!-- 图片/卡片模式（实时预览） -->
         <div v-else class="grid-view">
-          <div
+          <StreamPreviewCard
             v-for="stream in streams"
             :key="stream.id"
-            class="stream-card"
+            :stream="stream"
             @click="goToPlayer(stream.id)"
-          >
-            <div class="card-thumbnail">
-              <Icon name="video" size="36" color="rgba(255,255,255,0.6)" />
-            </div>
-            <div class="card-info">
-              <div class="card-title">{{ stream.name }}</div>
-              <div class="card-location">{{ stream.location || '未设置' }}</div>
-              <Tag :type="stream.status === 'online' ? 'success' : 'default'" size="small">
-                {{ stream.status === 'online' ? '在线' : '离线' }}
-              </Tag>
-            </div>
-          </div>
+          />
         </div>
       </PullRefresh>
     </div>
@@ -165,49 +155,5 @@ const goToPlayer = (streamId: string) => {
   grid-template-columns: 1fr 1fr;
   gap: 12px;
   padding: 12px;
-}
-
-.stream-card {
-  background-color: var(--bg-card);
-  border-radius: 10px;
-  overflow: hidden;
-  box-shadow: 0 2px 8px var(--shadow-light);
-  cursor: pointer;
-  transition: transform 0.2s;
-}
-
-.stream-card:active {
-  transform: scale(0.97);
-}
-
-.card-thumbnail {
-  aspect-ratio: 16 / 9;
-  background: linear-gradient(135deg, #2c3e50, #3498db);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.card-info {
-  padding: 10px;
-}
-
-.card-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: 4px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.card-location {
-  font-size: 12px;
-  color: var(--text-secondary);
-  margin-bottom: 6px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 </style>
