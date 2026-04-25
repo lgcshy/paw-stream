@@ -24,6 +24,7 @@ type UserInfo struct {
 	ID        string    `json:"id"`
 	Username  string    `json:"username"`
 	Nickname  string    `json:"nickname"`
+	AvatarURL string    `json:"avatar_url,omitempty"`
 	Disabled  bool      `json:"disabled"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`

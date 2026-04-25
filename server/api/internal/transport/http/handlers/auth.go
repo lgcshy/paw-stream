@@ -1,6 +1,11 @@
 package handlers
 
 import (
+	"fmt"
+	"io"
+	"mime/multipart"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -94,14 +99,7 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 	}
 
 	// Return user info (exclude password)
-	return c.Status(fiber.StatusCreated).JSON(UserInfo{
-		ID:        newUser.ID,
-		Username:  newUser.Username,
-		Nickname:  newUser.Nickname,
-		Disabled:  newUser.Disabled,
-		CreatedAt: newUser.CreatedAt,
-		UpdatedAt: newUser.UpdatedAt,
-	})
+	return c.Status(fiber.StatusCreated).JSON(toUserInfo(newUser))
 }
 
 // Login handles POST /api/login
@@ -159,16 +157,10 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 	}
 
 	// Return token and user info
+	info := toUserInfo(authenticatedUser)
 	return c.JSON(LoginResponse{
 		Token: token,
-		User: &UserInfo{
-			ID:        authenticatedUser.ID,
-			Username:  authenticatedUser.Username,
-			Nickname:  authenticatedUser.Nickname,
-			Disabled:  authenticatedUser.Disabled,
-			CreatedAt: authenticatedUser.CreatedAt,
-			UpdatedAt: authenticatedUser.UpdatedAt,
-		},
+		User:  &info,
 	})
 }
 
@@ -202,12 +194,148 @@ func (h *AuthHandler) GetMe(c *fiber.Ctx) error {
 	}
 
 	// Return user info
-	return c.JSON(UserInfo{
-		ID:        currentUser.ID,
-		Username:  currentUser.Username,
-		Nickname:  currentUser.Nickname,
-		Disabled:  currentUser.Disabled,
-		CreatedAt: currentUser.CreatedAt,
-		UpdatedAt: currentUser.UpdatedAt,
+	return c.JSON(toUserInfo(currentUser))
+}
+
+// toUserInfo converts a domain user to a UserInfo response
+func toUserInfo(u *user.User) UserInfo {
+	info := UserInfo{
+		ID:        u.ID,
+		Username:  u.Username,
+		Nickname:  u.Nickname,
+		Disabled:  u.Disabled,
+		CreatedAt: u.CreatedAt,
+		UpdatedAt: u.UpdatedAt,
+	}
+	if u.AvatarPath != "" {
+		info.AvatarURL = fmt.Sprintf("/api/avatars/%s", u.ID)
+	}
+	return info
+}
+
+const (
+	avatarDir     = "data/avatars"
+	maxAvatarSize = 2 * 1024 * 1024 // 2MB
+)
+
+var allowedAvatarTypes = map[string]string{
+	"image/jpeg": ".jpg",
+	"image/png":  ".png",
+	"image/webp": ".webp",
+}
+
+// UploadAvatar handles POST /api/me/avatar
+func (h *AuthHandler) UploadAvatar(c *fiber.Ctx) error {
+	userID, ok := c.Locals("user_id").(string)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(ErrorResponse{
+			Error:     "unauthorized",
+			Message:   "User not authenticated",
+			RequestID: c.Locals("request_id").(string),
+		})
+	}
+
+	// Get uploaded file
+	fileHeader, err := c.FormFile("avatar")
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(ErrorResponse{
+			Error:     "bad_request",
+			Message:   "No avatar file provided",
+			RequestID: c.Locals("request_id").(string),
+		})
+	}
+
+	// Check file size
+	if fileHeader.Size > maxAvatarSize {
+		return c.Status(fiber.StatusBadRequest).JSON(ErrorResponse{
+			Error:     "file_too_large",
+			Message:   "Avatar file must be less than 2MB",
+			RequestID: c.Locals("request_id").(string),
+		})
+	}
+
+	// Check file type
+	contentType := fileHeader.Header.Get("Content-Type")
+	ext, ok := allowedAvatarTypes[contentType]
+	if !ok {
+		return c.Status(fiber.StatusBadRequest).JSON(ErrorResponse{
+			Error:     "invalid_file_type",
+			Message:   "Avatar must be JPEG, PNG, or WebP",
+			RequestID: c.Locals("request_id").(string),
+		})
+	}
+
+	// Save file
+	if err := os.MkdirAll(avatarDir, 0o755); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{
+			Error:     "internal_error",
+			Message:   "Failed to save avatar",
+			RequestID: c.Locals("request_id").(string),
+		})
+	}
+
+	avatarPath := filepath.Join(avatarDir, userID+ext)
+
+	// Remove old avatar files (different extensions)
+	for _, e := range allowedAvatarTypes {
+		os.Remove(filepath.Join(avatarDir, userID+e))
+	}
+
+	if err := saveUploadedFile(fileHeader, avatarPath); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{
+			Error:     "internal_error",
+			Message:   "Failed to save avatar",
+			RequestID: c.Locals("request_id").(string),
+		})
+	}
+
+	// Update database
+	updatedUser, err := h.userService.UpdateAvatar(c.Context(), userID, avatarPath)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{
+			Error:     "internal_error",
+			Message:   "Failed to update avatar",
+			RequestID: c.Locals("request_id").(string),
+		})
+	}
+
+	return c.JSON(toUserInfo(updatedUser))
+}
+
+// GetAvatar handles GET /api/avatars/:id
+func (h *AuthHandler) GetAvatar(c *fiber.Ctx) error {
+	userID := c.Params("id")
+
+	// Find avatar file
+	for contentType, ext := range allowedAvatarTypes {
+		avatarPath := filepath.Join(avatarDir, userID+ext)
+		if _, err := os.Stat(avatarPath); err == nil {
+			c.Set("Content-Type", contentType)
+			c.Set("Cache-Control", "public, max-age=3600")
+			return c.SendFile(avatarPath)
+		}
+	}
+
+	return c.Status(fiber.StatusNotFound).JSON(ErrorResponse{
+		Error:   "not_found",
+		Message: "Avatar not found",
 	})
+}
+
+// saveUploadedFile saves a multipart file to disk
+func saveUploadedFile(fh *multipart.FileHeader, dst string) error {
+	src, err := fh.Open()
+	if err != nil {
+		return err
+	}
+	defer src.Close()
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, src)
+	return err
 }

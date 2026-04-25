@@ -3,7 +3,20 @@
     <div class="profile-page">
       <!-- User Info Header -->
       <div class="user-header">
-        <van-icon name="user-circle-o" size="60" color="#1989fa" />
+        <div class="avatar-wrapper" @click="triggerAvatarUpload">
+          <img v-if="avatarURL" :src="avatarURL" class="avatar-img" alt="头像" />
+          <van-icon v-else name="user-circle-o" size="60" color="#1989fa" />
+          <div class="avatar-edit-hint">
+            <van-icon name="photograph" size="14" color="#fff" />
+          </div>
+        </div>
+        <input
+          ref="fileInputRef"
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          class="hidden-input"
+          @change="onFileSelected"
+        />
         <div class="user-info">
           <h2>{{ user?.nickname || user?.username || '用户' }}</h2>
           <p class="username">@{{ user?.username }}</p>
@@ -90,10 +103,12 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useDeviceStore } from '@/stores/device'
 import { useThemeStore } from '@/stores/theme'
-import { showSuccessToast } from 'vant'
+import { showSuccessToast, showFailToast, showLoadingToast, closeToast } from 'vant'
 import type { ActionSheetAction } from 'vant'
 import Layout from '@/components/Layout.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -103,6 +118,12 @@ const themeStore = useThemeStore()
 const showLogoutConfirm = ref(false)
 const showAboutDialog = ref(false)
 const showThemePicker = ref(false)
+const fileInputRef = ref<HTMLInputElement | null>(null)
+
+const avatarURL = computed(() => {
+  if (!user.value?.avatar_url) return ''
+  return `${API_BASE_URL}${user.value.avatar_url}?t=${user.value.updated_at}`
+})
 
 const user = computed(() => authStore.user)
 const deviceCount = computed(() => deviceStore.devices?.length ?? 0)
@@ -161,6 +182,34 @@ function onThemeSelect(action: ActionSheetAction) {
   
   themeStore.setMode(mode)
   showSuccessToast(`已切换到${action.name}`)
+}
+
+function triggerAvatarUpload() {
+  fileInputRef.value?.click()
+}
+
+async function onFileSelected(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+
+  // Reset input so same file can be re-selected
+  input.value = ''
+
+  if (file.size > 2 * 1024 * 1024) {
+    showFailToast('图片大小不能超过 2MB')
+    return
+  }
+
+  showLoadingToast({ message: '上传中...', forbidClick: true })
+  try {
+    await authStore.updateAvatar(file)
+    closeToast()
+    showSuccessToast('头像更新成功')
+  } catch (error) {
+    closeToast()
+    showFailToast('上传失败')
+  }
 }
 
 function formatDate(dateStr: string) {
@@ -263,6 +312,39 @@ onMounted(async () => {
 .user-header > * {
   position: relative;
   z-index: 1;
+}
+
+.avatar-wrapper {
+  position: relative;
+  cursor: pointer;
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+}
+
+.avatar-img {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+}
+
+.avatar-edit-hint {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hidden-input {
+  display: none;
 }
 
 .user-info {

@@ -123,3 +123,20 @@ func (s *Service) Update(ctx context.Context, id string, input UpdateUserInput) 
 
 	return user, nil
 }
+
+// UpdateAvatar updates a user's avatar path
+func (s *Service) UpdateAvatar(ctx context.Context, id string, avatarPath string) (*User, error) {
+	user, err := s.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	user.AvatarPath = avatarPath
+	user.UpdatedAt = time.Now()
+
+	if err := s.repo.Update(ctx, user); err != nil {
+		return nil, errors.Wrap(err, "failed to update avatar")
+	}
+
+	return user, nil
+}

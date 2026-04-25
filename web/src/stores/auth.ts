@@ -75,6 +75,12 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  async function updateAvatar(file: File) {
+    const updatedUser = await authApi.uploadAvatar(file)
+    user.value = updatedUser
+    return updatedUser
+  }
+
   async function checkAuth() {
     if (!token.value) {
       await loadToken()
@@ -94,6 +100,7 @@ export const useAuthStore = defineStore('auth', () => {
     register,
     logout,
     loadToken,
+    updateAvatar,
     checkAuth,
   }
 })

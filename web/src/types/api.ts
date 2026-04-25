@@ -17,6 +17,7 @@ export interface UserInfo {
   id: string
   username: string
   nickname: string
+  avatar_url?: string
   disabled: boolean
   created_at: string
   updated_at: string

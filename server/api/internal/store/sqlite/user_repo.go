@@ -21,11 +21,11 @@ func NewUserRepository(db *DB) *UserRepository {
 // Create creates a new user
 func (r *UserRepository) Create(ctx context.Context, u *user.User) error {
 	query := `
-		INSERT INTO users (id, username, nickname, password_hash, disabled, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO users (id, username, nickname, password_hash, avatar_path, disabled, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	_, err := r.db.ExecContext(ctx, query,
-		u.ID, u.Username, u.Nickname, u.PasswordHash,
+		u.ID, u.Username, u.Nickname, u.PasswordHash, u.AvatarPath,
 		u.Disabled, u.CreatedAt, u.UpdatedAt,
 	)
 	if err != nil {
@@ -37,13 +37,13 @@ func (r *UserRepository) Create(ctx context.Context, u *user.User) error {
 // GetByID retrieves a user by ID
 func (r *UserRepository) GetByID(ctx context.Context, id string) (*user.User, error) {
 	query := `
-		SELECT id, username, nickname, password_hash, disabled, created_at, updated_at
+		SELECT id, username, nickname, password_hash, avatar_path, disabled, created_at, updated_at
 		FROM users
 		WHERE id = ?
 	`
 	var u user.User
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
-		&u.ID, &u.Username, &u.Nickname, &u.PasswordHash,
+		&u.ID, &u.Username, &u.Nickname, &u.PasswordHash, &u.AvatarPath,
 		&u.Disabled, &u.CreatedAt, &u.UpdatedAt,
 	)
 	if err == sql.ErrNoRows {
@@ -58,13 +58,13 @@ func (r *UserRepository) GetByID(ctx context.Context, id string) (*user.User, er
 // GetByUsername retrieves a user by username
 func (r *UserRepository) GetByUsername(ctx context.Context, username string) (*user.User, error) {
 	query := `
-		SELECT id, username, nickname, password_hash, disabled, created_at, updated_at
+		SELECT id, username, nickname, password_hash, avatar_path, disabled, created_at, updated_at
 		FROM users
 		WHERE username = ?
 	`
 	var u user.User
 	err := r.db.QueryRowContext(ctx, query, username).Scan(
-		&u.ID, &u.Username, &u.Nickname, &u.PasswordHash,
+		&u.ID, &u.Username, &u.Nickname, &u.PasswordHash, &u.AvatarPath,
 		&u.Disabled, &u.CreatedAt, &u.UpdatedAt,
 	)
 	if err == sql.ErrNoRows {
@@ -80,11 +80,11 @@ func (r *UserRepository) GetByUsername(ctx context.Context, username string) (*u
 func (r *UserRepository) Update(ctx context.Context, u *user.User) error {
 	query := `
 		UPDATE users
-		SET nickname = ?, password_hash = ?, disabled = ?, updated_at = ?
+		SET nickname = ?, password_hash = ?, avatar_path = ?, disabled = ?, updated_at = ?
 		WHERE id = ?
 	`
 	_, err := r.db.ExecContext(ctx, query,
-		u.Nickname, u.PasswordHash, u.Disabled, u.UpdatedAt, u.ID,
+		u.Nickname, u.PasswordHash, u.AvatarPath, u.Disabled, u.UpdatedAt, u.ID,
 	)
 	if err != nil {
 		return errors.Wrap(err, "failed to update user")
@@ -105,7 +105,7 @@ func (r *UserRepository) Delete(ctx context.Context, id string) error {
 // List retrieves all users with pagination
 func (r *UserRepository) List(ctx context.Context, limit, offset int) ([]*user.User, error) {
 	query := `
-		SELECT id, username, nickname, password_hash, disabled, created_at, updated_at
+		SELECT id, username, nickname, password_hash, avatar_path, disabled, created_at, updated_at
 		FROM users
 		ORDER BY created_at DESC
 		LIMIT ? OFFSET ?
@@ -120,7 +120,7 @@ func (r *UserRepository) List(ctx context.Context, limit, offset int) ([]*user.U
 	for rows.Next() {
 		var u user.User
 		if err := rows.Scan(
-			&u.ID, &u.Username, &u.Nickname, &u.PasswordHash,
+			&u.ID, &u.Username, &u.Nickname, &u.PasswordHash, &u.AvatarPath,
 			&u.Disabled, &u.CreatedAt, &u.UpdatedAt,
 		); err != nil {
 			return nil, errors.Wrap(err, "failed to scan user")

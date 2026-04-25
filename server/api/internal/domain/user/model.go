@@ -8,6 +8,7 @@ type User struct {
 	Username     string    `json:"username"`
 	Nickname     string    `json:"nickname"`
 	PasswordHash string    `json:"-"` // Never expose password hash in JSON
+	AvatarPath   string    `json:"avatar_path,omitempty"`
 	Disabled     bool      `json:"disabled"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`

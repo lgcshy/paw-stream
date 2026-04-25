@@ -30,6 +30,10 @@ func (a *App) setupRoutes() {
 
 	// User info
 	protected.Get("/me", a.authHandler.GetMe)
+	protected.Post("/me/avatar", a.authHandler.UploadAvatar)
+
+	// Avatar serving (public)
+	api.Get("/avatars/:id", a.authHandler.GetAvatar)
 
 	// Device management
 	protected.Get("/devices", a.deviceHandler.List)
