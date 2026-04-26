@@ -1,469 +1,378 @@
 /**
- * PawStream Edge Client Web UI
+ * PawStream Edge Client — Unified App
  */
 
-// Global state
-const state = {
-    config: {},
-    status: {},
-    logs: [],
-    sseClient: null
-};
+// ---- State ----
+let authToken = '';
+let selectedDeviceId = '';
+let selectedDeviceSecret = '';
+let sseClient = null;
+let sysInfoTimer = null;
+let startTime = null;
 
-// Initialize app on DOM ready
-document.addEventListener('DOMContentLoaded', () => {
-    initTabs();
-    initConfigForm();
-    initSSE();
-    loadConfig();
-    loadSystemInfo();
-    initAutoRefresh();
-});
+// ---- Setup Flow ----
 
-/**
- * Initialize tab switching
- */
-function initTabs() {
-    const tabBtns = document.querySelectorAll('.tab-btn');
-    const tabContents = document.querySelectorAll('.tab-content');
+async function connectServer() {
+    const btn = document.getElementById('btn-connect');
+    const raw = document.getElementById('api-url').value.trim();
+    if (!raw) return showAlert('请输入服务器地址', 'error');
 
-    tabBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            const tabName = btn.dataset.tab;
+    const url = raw.startsWith('http') ? raw : 'http://' + raw;
 
-            // Remove active class from all tabs
-            tabBtns.forEach(b => b.classList.remove('active'));
-            tabContents.forEach(c => c.classList.remove('active'));
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> 连接中...';
 
-            // Add active class to clicked tab
-            btn.classList.add('active');
-            document.getElementById(tabName).classList.add('active');
+    try {
+        const res = await fetch('/api/validate-server', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url })
         });
-    });
+        const data = await res.json();
+
+        if (!data.valid) throw new Error(data.message || '无法连接');
+
+        showAlert('服务器连接成功', 'success');
+        document.getElementById('step-login').style.display = '';
+        document.getElementById('step-login').scrollIntoView({ behavior: 'smooth' });
+    } catch (e) {
+        showAlert('连接失败: ' + e.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '连接';
+    }
 }
 
-/**
- * Initialize configuration form
- */
-function initConfigForm() {
-    const form = document.getElementById('configForm');
-    const inputType = document.getElementById('inputType');
-    const inputSource = document.getElementById('inputSource');
-    const inputSourceHelp = document.getElementById('inputSourceHelp');
-    const webuiAuthEnabled = document.getElementById('webuiAuthEnabled');
-    const webuiAuthGroup = document.getElementById('webuiAuthGroup');
+async function doLogin() {
+    const btn = document.getElementById('btn-login');
+    const username = document.getElementById('username').value.trim();
+    const password = document.getElementById('password').value;
 
-    // Input type change handler
-    inputType.addEventListener('change', () => {
-        const type = inputType.value;
-        switch (type) {
-            case 'testsrc':
-                inputSource.placeholder = '留空使用默认';
-                inputSourceHelp.textContent = '使用内置测试图案';
-                break;
-            case 'file':
-                inputSource.placeholder = '/path/to/video.mp4';
-                inputSourceHelp.textContent = '视频文件的完整路径';
-                break;
-            case 'v4l2':
-                inputSource.placeholder = '/dev/video0';
-                inputSourceHelp.textContent = 'V4L2 设备路径';
-                break;
-            case 'rtsp':
-                inputSource.placeholder = 'rtsp://camera-ip:554/stream';
-                inputSourceHelp.textContent = 'RTSP 流地址';
-                break;
-        }
-    });
+    if (!username || !password) return showAlert('请输入用户名和密码', 'error');
 
-    // Web UI Auth toggle
-    webuiAuthEnabled.addEventListener('change', () => {
-        webuiAuthGroup.style.display = webuiAuthEnabled.checked ? 'block' : 'none';
-    });
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> 登录中...';
 
-    // Password toggle
-    document.querySelectorAll('.toggle-password').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const input = btn.previousElementSibling;
-            input.type = input.type === 'password' ? 'text' : 'password';
-            btn.textContent = input.type === 'password' ? '👁️' : '🙈';
+    try {
+        const res = await fetch('/api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
         });
-    });
 
-    // Validate API server
-    document.getElementById('validateBtn').addEventListener('click', async () => {
-        const apiUrl = document.getElementById('apiUrl').value;
-        if (!apiUrl) {
-            showNotification('请输入 API 服务器地址', 'warning');
-            return;
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.message || '登录失败');
         }
 
-        try {
-            const response = await fetch('/api/validate-server', {
+        const data = await res.json();
+        authToken = data.token || '';
+
+        showAlert('登录成功', 'success');
+        document.getElementById('step-device').style.display = '';
+        document.getElementById('step-device').scrollIntoView({ behavior: 'smooth' });
+        loadDevices();
+    } catch (e) {
+        showAlert('登录失败: ' + e.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '登录';
+    }
+}
+
+async function loadDevices() {
+    try {
+        const res = await fetch('/api/devices', {
+            headers: { 'Authorization': 'Bearer ' + authToken }
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        renderDevices(data.devices || data || []);
+    } catch (_) { /* non-critical */ }
+}
+
+function renderDevices(devices) {
+    const grid = document.getElementById('device-list');
+    if (!devices.length) {
+        grid.innerHTML = '<p style="color:var(--text-dim);font-size:0.9rem;">暂无设备，请创建新设备</p>';
+        return;
+    }
+
+    grid.innerHTML = devices.map(d => `
+        <div class="device-card" data-id="${d.id}" onclick="selectDevice('${d.id}','${d.name || ''}')">
+            <div class="name">${escapeHtml(d.name || d.id)}</div>
+            <div class="meta">${escapeHtml(d.location || '')} · ${d.enabled ? '已启用' : '未启用'}</div>
+        </div>
+    `).join('');
+}
+
+function selectDevice(id, name) {
+    selectedDeviceId = id;
+    // Clear new-device fields
+    document.getElementById('device-name').value = '';
+    document.getElementById('device-location').value = '';
+
+    // Highlight selected card
+    document.querySelectorAll('.device-card').forEach(c => c.classList.remove('selected'));
+    const card = document.querySelector(`.device-card[data-id="${id}"]`);
+    if (card) card.classList.add('selected');
+
+    // Show secret input
+    document.getElementById('device-secret-field').style.display = '';
+    document.getElementById('device-secret').focus();
+}
+
+async function startStreaming() {
+    const btn = document.getElementById('btn-start');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> 配置中...';
+
+    try {
+        let deviceId = selectedDeviceId;
+        let deviceSecret = document.getElementById('device-secret').value.trim();
+        const newName = document.getElementById('device-name').value.trim();
+
+        // Create new device if name is provided and no existing device selected
+        if (newName && !selectedDeviceId) {
+            const location = document.getElementById('device-location').value.trim();
+            const res = await fetch('/api/devices', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url: apiUrl })
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + authToken
+                },
+                body: JSON.stringify({ name: newName, location })
             });
 
-            const result = await response.json();
-            if (result.valid) {
-                showNotification('API 服务器连接成功！', 'success');
-            } else {
-                showNotification(`连接失败: ${result.message}`, 'error');
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.message || '创建设备失败');
             }
-        } catch (err) {
-            showNotification(`验证失败: ${err.message}`, 'error');
+
+            const data = await res.json();
+            deviceId = data.id || data.device?.id;
+            deviceSecret = data.secret || data.device?.secret || '';
         }
-    });
 
-    // Form submission
-    form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        await saveConfig();
-    });
+        if (!deviceId) throw new Error('请选择已有设备或输入新设备名称');
+        if (!deviceSecret) throw new Error('请输入设备密钥');
 
-    // Reload button
-    document.getElementById('reloadBtn').addEventListener('click', () => {
-        loadConfig();
-    });
+        // Get API URL
+        const raw = document.getElementById('api-url').value.trim();
+        const apiUrl = raw.startsWith('http') ? raw : 'http://' + raw;
 
-    // Clear logs
-    document.getElementById('clearLogsBtn').addEventListener('click', () => {
-        state.logs = [];
-        updateLogDisplay();
-    });
+        // Quick setup — saves config with smart defaults & triggers streaming
+        const setupRes = await fetch('/api/quick-setup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                api_url: apiUrl,
+                device_id: deviceId,
+                device_secret: deviceSecret
+            })
+        });
+
+        if (!setupRes.ok) {
+            const err = await setupRes.json().catch(() => ({}));
+            throw new Error(err.message || '配置保存失败');
+        }
+
+        showDashboard(newName || deviceId, deviceId);
+    } catch (e) {
+        showAlert(e.message, 'error');
+        btn.disabled = false;
+        btn.textContent = '开始推流';
+    }
 }
 
-/**
- * Initialize SSE connection
- */
+// ---- Dashboard ----
+
+function showDashboard(deviceName, deviceId) {
+    document.getElementById('setup').classList.remove('active');
+    document.getElementById('dashboard').classList.add('active');
+    document.getElementById('settings-btn').style.display = '';
+    document.getElementById('dash-device').textContent = deviceName || 'PawStream';
+
+    // Populate settings fields
+    const raw = document.getElementById('api-url').value.trim();
+    document.getElementById('cfg-api-url').value = raw.startsWith('http') ? raw : 'http://' + raw;
+    document.getElementById('cfg-device-id').value = deviceId || '';
+
+    startTime = Date.now();
+
+    // Start SSE
+    initSSE();
+    // Start system info polling
+    loadSystemInfo();
+    sysInfoTimer = setInterval(loadSystemInfo, 5000);
+}
+
 function initSSE() {
-    state.sseClient = new SSEClient('/api/events');
+    if (sseClient) sseClient.disconnect();
 
-    state.sseClient.on('connected', () => {
-        updateConnectionStatus(true);
+    sseClient = new SSEClient('/api/events');
+
+    sseClient.on('connected', () => {
+        setBadge(true);
     });
 
-    state.sseClient.on('status', (status) => {
-        state.status = status;
-        updateStatusDisplay();
+    sseClient.on('status', (status) => {
+        updateDashStatus(status);
     });
 
-    state.sseClient.on('log', (log) => {
-        addLog(log);
+    sseClient.on('log', (entry) => {
+        addLogEntry(entry);
     });
 
-    state.sseClient.on('config', () => {
-        showNotification('配置已更新', 'info');
-        loadConfig();
+    sseClient.on('config', () => {
+        showAlert('配置已更新', 'info');
     });
 
-    state.sseClient.on('error', () => {
-        updateConnectionStatus(false);
+    sseClient.on('error', () => {
+        setBadge(false);
     });
 
-    state.sseClient.connect();
+    sseClient.connect();
 }
 
-/**
- * Load configuration from server
- */
-async function loadConfig() {
-    try {
-        const response = await fetch('/api/config');
-        if (!response.ok) {
-            throw new Error('Failed to load config');
-        }
+function setBadge(online) {
+    const badge = document.getElementById('dash-badge');
+    const text = document.getElementById('dash-badge-text');
+    badge.className = 'status-badge ' + (online ? 'online' : 'offline');
+    text.textContent = online ? '在线' : '离线';
+}
 
-        const config = await response.json();
-        state.config = config;
-        populateConfigForm(config);
-    } catch (err) {
-        console.error('Failed to load config:', err);
-        showNotification('加载配置失败', 'error');
+function updateDashStatus(status) {
+    setBadge(true);
+
+    const uptime = status.uptime || formatUptime(Date.now() - startTime);
+    document.getElementById('dash-uptime').textContent = uptime;
+    document.getElementById('dash-frames').textContent = status.frames_pushed || '--';
+    document.getElementById('dash-stream').textContent = status.stream_status || status.client_status || '--';
+}
+
+async function loadSystemInfo() {
+    try {
+        const res = await fetch('/api/system/info');
+        if (!res.ok) return;
+        const info = await res.json();
+
+        const cpu = (info.cpu?.usage_total || 0).toFixed(1);
+        const mem = (info.memory?.used_percent || 0).toFixed(1);
+        const disk = (info.disk?.used_percent || 0).toFixed(1);
+
+        document.getElementById('res-cpu').textContent = cpu + '%';
+        document.getElementById('res-mem').textContent = mem + '%';
+        document.getElementById('res-disk').textContent = disk + '%';
+        document.getElementById('res-cpu-bar').style.width = cpu + '%';
+        document.getElementById('res-mem-bar').style.width = mem + '%';
+        document.getElementById('res-disk-bar').style.width = disk + '%';
+    } catch (_) { /* silent */ }
+}
+
+// ---- Logs ----
+
+function addLogEntry(entry) {
+    const box = document.getElementById('log-box');
+    const time = new Date(entry.timestamp).toLocaleTimeString('zh-CN', { hour12: false });
+    const lvl = (entry.level || 'info').toLowerCase();
+
+    const el = document.createElement('div');
+    el.className = 'entry';
+    el.innerHTML = `<span class="time">${time}</span><span class="lvl lvl-${lvl}">${entry.level || 'INFO'}</span><span class="msg">${escapeHtml(entry.message || '')}</span>`;
+    box.appendChild(el);
+
+    // Keep max 500 entries
+    while (box.children.length > 500) box.removeChild(box.firstChild);
+
+    if (document.getElementById('auto-scroll').checked) {
+        box.scrollTop = box.scrollHeight;
     }
 }
 
-/**
- * Save configuration to server
- */
-async function saveConfig() {
-    const form = document.getElementById('configForm');
-    const formData = new FormData(form);
-    
-    // Convert flat form data to nested object
-    const config = {};
-    for (const [key, value] of formData.entries()) {
-        const keys = key.split('.');
-        let current = config;
-        
-        for (let i = 0; i < keys.length - 1; i++) {
-            if (!current[keys[i]]) {
-                current[keys[i]] = {};
-            }
-            current = current[keys[i]];
-        }
-        
-        current[keys[keys.length - 1]] = value;
-    }
+function clearLogs() {
+    const box = document.getElementById('log-box');
+    box.innerHTML = '<div class="entry"><span class="time">--:--:--</span><span class="lvl lvl-info">INFO</span><span class="msg">日志已清空</span></div>';
+}
 
-    // Add checkbox values
-    config.webui = config.webui || {};
-    config.webui.auth = config.webui.auth || {};
-    config.webui.auth.enabled = document.getElementById('webuiAuthEnabled').checked;
+// ---- Settings Drawer ----
+
+function openSettings() {
+    document.getElementById('settings-drawer').classList.add('open');
+    document.getElementById('settings-overlay').classList.add('show');
+}
+
+function closeSettings() {
+    document.getElementById('settings-drawer').classList.remove('open');
+    document.getElementById('settings-overlay').classList.remove('show');
+}
+
+async function saveAdvancedConfig() {
+    const config = {
+        api_url: document.getElementById('cfg-api-url').value.trim(),
+        device_id: document.getElementById('cfg-device-id').value.trim(),
+        mediamtx_url: document.getElementById('cfg-mediamtx').value.trim(),
+        input_type: document.getElementById('cfg-input-type').value
+    };
 
     try {
-        const response = await fetch('/api/config', {
+        const res = await fetch('/api/config', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(config)
         });
 
-        if (!response.ok) {
-            throw new Error('Failed to save config');
-        }
-
-        const result = await response.json();
-        showNotification('配置保存成功！将自动重载...', 'success');
-        state.config = config;
-    } catch (err) {
-        console.error('Failed to save config:', err);
-        showNotification('保存配置失败', 'error');
+        if (!res.ok) throw new Error('保存失败');
+        showAlert('设置已保存', 'success');
+        closeSettings();
+    } catch (e) {
+        showAlert('保存失败: ' + e.message, 'error');
     }
 }
 
-/**
- * Populate form with config data
- */
-function populateConfigForm(config) {
-    // API settings
-    setFormValue('apiUrl', config.api?.url);
-    
-    // Device settings
-    setFormValue('deviceId', config.device?.id);
-    setFormValue('deviceSecret', config.device?.secret);
-    
-    // Input settings
-    setFormValue('inputType', config.input?.type);
-    setFormValue('inputSource', config.input?.source);
-    
-    // MediaMTX settings
-    setFormValue('mediamtxUrl', config.mediamtx?.url);
-    
-    // Web UI settings
-    setFormValue('webuiPort', config.webui?.port);
-    
-    const authEnabled = config.webui?.auth?.enabled || false;
-    document.getElementById('webuiAuthEnabled').checked = authEnabled;
-    document.getElementById('webuiAuthGroup').style.display = authEnabled ? 'block' : 'none';
-    
-    setFormValue('webuiAuthUser', config.webui?.auth?.username);
-    setFormValue('webuiAuthPass', config.webui?.auth?.password);
+// ---- Alerts ----
 
-    // Trigger input type change to update help text
-    document.getElementById('inputType').dispatchEvent(new Event('change'));
+function showAlert(msg, type) {
+    const el = document.getElementById('alert');
+    el.textContent = msg;
+    el.className = 'alert show alert-' + (type || 'info');
+
+    clearTimeout(showAlert._timer);
+    showAlert._timer = setTimeout(() => {
+        el.classList.remove('show');
+    }, 4000);
 }
 
-/**
- * Set form field value
- */
-function setFormValue(id, value) {
-    const element = document.getElementById(id);
-    if (element && value !== undefined && value !== null) {
-        element.value = value;
-    }
-}
+// ---- Utilities ----
 
-/**
- * Load system information
- */
-async function loadSystemInfo() {
-    try {
-        const response = await fetch('/api/system/info');
-        if (!response.ok) {
-            throw new Error('Failed to load system info');
-        }
-
-        const info = await response.json();
-        updateSystemInfo(info);
-    } catch (err) {
-        console.error('Failed to load system info:', err);
-    }
-}
-
-/**
- * Update system information display
- */
-function updateSystemInfo(info) {
-    // Host info
-    setText('sysHostname', info.host?.hostname || '-');
-    setText('sysOS', `${info.host?.platform || '-'} ${info.host?.platform_version || ''}`);
-    setText('sysUptime', info.host?.uptime_formatted || '-');
-
-    // CPU
-    const cpuUsage = info.cpu?.usage_total || 0;
-    setText('cpuUsage', `${cpuUsage.toFixed(1)}%`);
-    setProgressBar('cpuProgress', cpuUsage);
-
-    // Memory
-    const memPercent = info.memory?.used_percent || 0;
-    const memUsed = formatBytes(info.memory?.used || 0);
-    const memTotal = formatBytes(info.memory?.total || 0);
-    setText('memUsage', `${memUsed} / ${memTotal} (${memPercent.toFixed(1)}%)`);
-    setProgressBar('memProgress', memPercent);
-
-    // Disk
-    const diskPercent = info.disk?.used_percent || 0;
-    const diskUsed = formatBytes(info.disk?.used || 0);
-    const diskTotal = formatBytes(info.disk?.total || 0);
-    setText('diskUsage', `${diskUsed} / ${diskTotal} (${diskPercent.toFixed(1)}%)`);
-    setProgressBar('diskProgress', diskPercent);
-}
-
-/**
- * Update status display
- */
-function updateStatusDisplay() {
-    const status = state.status;
-    
-    setText('clientStatus', status.client_status || '-');
-    setText('streamStatus', status.stream_status || '-');
-    setText('uptime', status.uptime || '-');
-    setText('framesPushed', status.frames_pushed || '0');
-}
-
-/**
- * Update connection status indicator
- */
-function updateConnectionStatus(connected) {
-    const statusDot = document.getElementById('statusDot');
-    const statusText = document.getElementById('statusText');
-
-    if (connected) {
-        statusDot.classList.add('connected');
-        statusDot.classList.remove('error');
-        statusText.textContent = '已连接';
-    } else {
-        statusDot.classList.remove('connected');
-        statusDot.classList.add('error');
-        statusText.textContent = '连接断开';
-    }
-}
-
-/**
- * Add log entry
- */
-function addLog(log) {
-    state.logs.push(log);
-    
-    // Keep only last 500 logs
-    if (state.logs.length > 500) {
-        state.logs = state.logs.slice(-500);
-    }
-
-    updateLogDisplay();
-}
-
-/**
- * Update log display
- */
-function updateLogDisplay() {
-    const container = document.getElementById('logContainer');
-    const autoScroll = document.getElementById('autoScrollCheck').checked;
-
-    if (state.logs.length === 0) {
-        container.innerHTML = `
-            <div class="log-entry">
-                <span class="log-time">--:--:--</span>
-                <span class="log-level level-info">INFO</span>
-                <span class="log-message">暂无日志</span>
-            </div>
-        `;
-        return;
-    }
-
-    container.innerHTML = state.logs.map(log => {
-        const time = new Date(log.timestamp).toLocaleTimeString('zh-CN', { hour12: false });
-        const levelClass = `level-${log.level.toLowerCase()}`;
-        
-        return `
-            <div class="log-entry">
-                <span class="log-time">${time}</span>
-                <span class="log-level ${levelClass}">${log.level}</span>
-                <span class="log-message">${escapeHtml(log.message)}</span>
-            </div>
-        `;
-    }).join('');
-
-    if (autoScroll) {
-        container.scrollTop = container.scrollHeight;
-    }
-}
-
-/**
- * Initialize auto-refresh for system info
- */
-function initAutoRefresh() {
-    // Refresh system info every 5 seconds
-    setInterval(() => {
-        loadSystemInfo();
-    }, 5000);
-}
-
-/**
- * Helper: Set text content
- */
-function setText(id, text) {
-    const element = document.getElementById(id);
-    if (element) {
-        element.textContent = text;
-    }
-}
-
-/**
- * Helper: Set progress bar
- */
-function setProgressBar(id, percent) {
-    const element = document.getElementById(id);
-    if (element) {
-        element.style.width = `${Math.min(percent, 100)}%`;
-        
-        // Change color based on usage
-        if (percent > 90) {
-            element.style.background = 'var(--danger-color)';
-        } else if (percent > 70) {
-            element.style.background = 'var(--warning-color)';
-        } else {
-            element.style.background = 'var(--primary-color)';
-        }
-    }
-}
-
-/**
- * Helper: Format bytes
- */
-function formatBytes(bytes) {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-}
-
-/**
- * Helper: Escape HTML
- */
 function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
+    const d = document.createElement('div');
+    d.textContent = text;
+    return d.innerHTML;
 }
 
-/**
- * Show notification (simple alert for now)
- */
-function showNotification(message, type = 'info') {
-    // TODO: Implement better notification system
-    console.log(`[${type.toUpperCase()}]`, message);
-    alert(message);
+function formatUptime(ms) {
+    const s = Math.floor(ms / 1000);
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    if (h > 0) return h + '小时 ' + m + '分';
+    if (m > 0) return m + '分 ' + (s % 60) + '秒';
+    return s + '秒';
 }
+
+// ---- Init: check if already configured ----
+
+document.addEventListener('DOMContentLoaded', async () => {
+    try {
+        const res = await fetch('/api/config');
+        if (!res.ok) return;
+        const cfg = await res.json();
+
+        // If device is already configured, go straight to dashboard
+        if (cfg.device?.id && cfg.device?.secret) {
+            showDashboard(cfg.device.id, cfg.device.id);
+        }
+    } catch (_) {
+        // Fresh start — stay on setup
+    }
+});

@@ -84,9 +84,8 @@ func NewServer(cfg Config, handler *Handler, sseManager *SSEManager, logger zero
 
 // setupRoutes sets up all HTTP routes
 func (s *Server) setupRoutes() {
-	// Static files (embedded)
+	// Single page app - all pages served from index.html
 	s.app.Get("/", serveIndex)
-	s.app.Get("/setup", serveSetup)
 	s.app.Static("/", "./web", fiber.Static{
 		Compress:      true,
 		ByteRange:     true,
@@ -97,11 +96,12 @@ func (s *Server) setupRoutes() {
 	// API routes
 	api := s.app.Group("/api")
 
+	// Quick setup (one-click configuration)
+	api.Post("/quick-setup", s.handler.QuickSetup)
+
 	// Configuration
 	api.Get("/config", s.handler.GetConfig)
 	api.Post("/config", s.handler.SaveConfig)
-	api.Get("/config/export", s.handler.ExportConfig)
-	api.Post("/config/import", s.handler.ImportConfig)
 
 	// Status and system info
 	api.Get("/status", s.handler.GetStatus)
@@ -116,14 +116,6 @@ func (s *Server) setupRoutes() {
 	// Device management (proxy to API server)
 	api.Get("/devices", s.handler.GetDevices)
 	api.Post("/devices", s.handler.CreateDevice)
-
-	// Input sources detection
-	api.Get("/input-sources", s.handler.DetectInputSources)
-
-	// Streaming engines
-	api.Get("/engines/available", s.handler.GetEnginesAvailable)
-	api.Get("/engines/encoders", s.handler.GetEncoders)
-	api.Get("/presets", s.handler.GetPresets)
 
 	// Logs
 	api.Get("/logs/recent", s.handler.GetRecentLogs)
@@ -185,11 +177,6 @@ func (s *Server) Stop() error {
 // serveIndex serves the index.html file
 func serveIndex(c *fiber.Ctx) error {
 	return c.SendFile("./web/index.html")
-}
-
-// serveSetup serves the setup wizard page
-func serveSetup(c *fiber.Ctx) error {
-	return c.SendFile("./web/setup.html")
 }
 
 // errorHandler handles fiber errors
