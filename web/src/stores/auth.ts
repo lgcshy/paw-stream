@@ -22,8 +22,9 @@ export const useAuthStore = defineStore('auth', () => {
       token.value = response.token
       user.value = response.user
 
-      // Persist token to localStorage
+      // Persist tokens to localStorage
       localStorage.setItem('auth_token', response.token)
+      localStorage.setItem('refresh_token', response.refresh_token)
 
       return response
     } finally {
@@ -42,8 +43,9 @@ export const useAuthStore = defineStore('auth', () => {
       token.value = response.token
       user.value = response.user
 
-      // Persist token to localStorage
+      // Persist tokens to localStorage
       localStorage.setItem('auth_token', response.token)
+      localStorage.setItem('refresh_token', response.refresh_token)
 
       return response
     } finally {
@@ -55,6 +57,7 @@ export const useAuthStore = defineStore('auth', () => {
     token.value = null
     user.value = null
     localStorage.removeItem('auth_token')
+    localStorage.removeItem('refresh_token')
   }
 
   async function loadToken() {

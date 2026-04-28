@@ -6,6 +6,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000
 
 export class ApiClient {
   private baseURL: string
+  private refreshing: Promise<boolean> | null = null
 
   constructor(baseURL: string = API_BASE_URL) {
     this.baseURL = baseURL
@@ -19,11 +20,41 @@ export class ApiClient {
   }
 
   /**
+   * Attempt to refresh the access token using the stored refresh token
+   */
+  private async tryRefresh(): Promise<boolean> {
+    const refreshToken = localStorage.getItem('refresh_token')
+    if (!refreshToken) return false
+
+    try {
+      const response = await fetch(`${this.baseURL}/api/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      })
+
+      if (!response.ok) {
+        localStorage.removeItem('auth_token')
+        localStorage.removeItem('refresh_token')
+        return false
+      }
+
+      const data = await response.json()
+      localStorage.setItem('auth_token', data.token)
+      localStorage.setItem('refresh_token', data.refresh_token)
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  /**
    * Make an authenticated API request
    */
   async request<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
+    isRetry = false
   ): Promise<T> {
     const url = `${this.baseURL}${endpoint}`
     const token = this.getToken()
@@ -44,10 +75,24 @@ export class ApiClient {
         headers,
       })
 
-      // Handle different status codes
+      // Handle 401 with silent refresh
+      if (response.status === 401 && !isRetry) {
+        // Deduplicate concurrent refresh attempts
+        if (!this.refreshing) {
+          this.refreshing = this.tryRefresh().finally(() => { this.refreshing = null })
+        }
+        const refreshed = await this.refreshing
+        if (refreshed) {
+          return this.request<T>(endpoint, options, true)
+        }
+        // Refresh failed - redirect to login
+        window.location.href = '/login'
+        throw new Error('Authentication required')
+      }
+
       if (response.status === 401) {
-        // Unauthorized - clear auth and redirect to login
         localStorage.removeItem('auth_token')
+        localStorage.removeItem('refresh_token')
         window.location.href = '/login'
         throw new Error('Authentication required')
       }

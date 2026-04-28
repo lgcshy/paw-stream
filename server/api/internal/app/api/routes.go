@@ -18,9 +18,11 @@ func (a *App) setupRoutes() {
 	// Public config endpoint (no auth required)
 	api.Get("/config", a.configHandler.GetConfig)
 
-	// Auth endpoints (no auth required)
-	api.Post("/register", a.authHandler.Register)
-	api.Post("/login", a.authHandler.Login)
+	// Auth endpoints (no auth required, rate limited)
+	authLimiter := middleware.RateLimitAuth()
+	api.Post("/register", authLimiter, a.authHandler.Register)
+	api.Post("/login", authLimiter, a.authHandler.Login)
+	api.Post("/refresh", authLimiter, a.authHandler.Refresh)
 
 	// Device auth endpoint (for edge client, no auth required)
 	api.Post("/device/auth", a.deviceHandler.AuthDevice)

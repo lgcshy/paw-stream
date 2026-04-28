@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/lgc/pawstream/api/internal/pkg/crypto"
 	"github.com/lgc/pawstream/api/internal/pkg/errors"
 	"github.com/lgc/pawstream/api/internal/pkg/idgen"
 	"github.com/lgc/pawstream/api/internal/pkg/password"
@@ -12,13 +13,15 @@ import (
 
 // Service handles device business logic
 type Service struct {
-	repo Repository
+	repo          Repository
+	encryptionKey string
 }
 
 // NewService creates a new device service
-func NewService(repo Repository) *Service {
+func NewService(repo Repository, encryptionKey string) *Service {
 	return &Service{
-		repo: repo,
+		repo:          repo,
+		encryptionKey: encryptionKey,
 	}
 }
 
@@ -39,6 +42,16 @@ func (s *Service) Create(ctx context.Context, input CreateDeviceInput) (*Device,
 		return nil, nil, errors.Wrap(err, "failed to hash device secret")
 	}
 
+	// Encrypt secret for storage
+	secretCipher := secret
+	if s.encryptionKey != "" {
+		encrypted, err := crypto.Encrypt(secret, s.encryptionKey)
+		if err != nil {
+			return nil, nil, errors.Wrap(err, "failed to encrypt device secret")
+		}
+		secretCipher = encrypted
+	}
+
 	// Create device
 	device := &Device{
 		ID:            deviceID,
@@ -47,7 +60,7 @@ func (s *Service) Create(ctx context.Context, input CreateDeviceInput) (*Device,
 		Location:      input.Location,
 		PublishPath:   fmt.Sprintf("dogcam/%s", deviceID),
 		SecretHash:    secretHash,
-		SecretCipher:  secret, // TODO: Encrypt this in Phase 3
+		SecretCipher:  secretCipher,
 		SecretVersion: 1,
 		Disabled:      false,
 		CreatedAt:     time.Now(),
@@ -172,9 +185,19 @@ func (s *Service) RotateSecret(ctx context.Context, deviceID string) (*DeviceSec
 		return nil, errors.Wrap(err, "failed to hash new secret")
 	}
 
+	// Encrypt new secret
+	secretCipher := secret
+	if s.encryptionKey != "" {
+		encrypted, err := crypto.Encrypt(secret, s.encryptionKey)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to encrypt device secret")
+		}
+		secretCipher = encrypted
+	}
+
 	// Update device
 	device.SecretHash = secretHash
-	device.SecretCipher = secret // TODO: Encrypt this in Phase 3
+	device.SecretCipher = secretCipher
 	device.SecretVersion++
 	device.UpdatedAt = time.Now()
 

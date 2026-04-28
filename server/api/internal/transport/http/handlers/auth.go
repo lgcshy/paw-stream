@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -13,22 +15,28 @@ import (
 
 	"github.com/lgc/pawstream/api/internal/domain/user"
 	"github.com/lgc/pawstream/api/internal/pkg/errors"
+	"github.com/lgc/pawstream/api/internal/pkg/idgen"
 	"github.com/lgc/pawstream/api/internal/pkg/jwtutil"
+	"github.com/lgc/pawstream/api/internal/store/sqlite"
 )
 
 // AuthHandler handles authentication requests
 type AuthHandler struct {
-	userService *user.Service
-	jwtSecret   string
-	jwtExpiry   time.Duration
+	userService    *user.Service
+	refreshRepo    *sqlite.RefreshTokenRepository
+	jwtSecret      string
+	jwtExpiry      time.Duration
+	refreshExpiry  time.Duration
 }
 
 // NewAuthHandler creates a new auth handler
-func NewAuthHandler(userService *user.Service, jwtSecret string, jwtExpiry time.Duration) *AuthHandler {
+func NewAuthHandler(userService *user.Service, refreshRepo *sqlite.RefreshTokenRepository, jwtSecret string, jwtExpiry, refreshExpiry time.Duration) *AuthHandler {
 	return &AuthHandler{
-		userService: userService,
-		jwtSecret:   jwtSecret,
-		jwtExpiry:   jwtExpiry,
+		userService:   userService,
+		refreshRepo:   refreshRepo,
+		jwtSecret:     jwtSecret,
+		jwtExpiry:     jwtExpiry,
+		refreshExpiry: refreshExpiry,
 	}
 }
 
@@ -146,7 +154,7 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 		})
 	}
 
-	// Generate JWT token
+	// Generate JWT access token
 	token, err := jwtutil.GenerateToken(authenticatedUser.ID, authenticatedUser.Username, h.jwtSecret, h.jwtExpiry)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{
@@ -156,12 +164,133 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 		})
 	}
 
+	// Generate refresh token
+	refreshToken, err := h.createRefreshToken(c, authenticatedUser.ID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{
+			Error:     "internal_error",
+			Message:   "Failed to generate refresh token",
+			RequestID: c.Locals("request_id").(string),
+		})
+	}
+
 	// Return token and user info
 	info := toUserInfo(authenticatedUser)
 	return c.JSON(LoginResponse{
-		Token: token,
-		User:  &info,
+		Token:        token,
+		RefreshToken: refreshToken,
+		User:         &info,
 	})
+}
+
+// Refresh handles POST /api/refresh
+func (h *AuthHandler) Refresh(c *fiber.Ctx) error {
+	var req RefreshRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(ErrorResponse{
+			Error:   "bad_request",
+			Message: "Invalid request body",
+		})
+	}
+
+	if req.RefreshToken == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(ErrorResponse{
+			Error:   "validation_error",
+			Message: "Refresh token is required",
+		})
+	}
+
+	// Hash the token to look it up
+	tokenHash := hashToken(req.RefreshToken)
+	stored, err := h.refreshRepo.GetByTokenHash(c.Context(), tokenHash)
+	if err != nil || stored == nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(ErrorResponse{
+			Error:   "invalid_token",
+			Message: "Invalid refresh token",
+		})
+	}
+
+	// Check if revoked or expired
+	if stored.Revoked || stored.ExpiresAt.Before(time.Now()) {
+		return c.Status(fiber.StatusUnauthorized).JSON(ErrorResponse{
+			Error:   "invalid_token",
+			Message: "Refresh token expired or revoked",
+		})
+	}
+
+	// Revoke the old refresh token (single use)
+	_ = h.refreshRepo.Revoke(c.Context(), stored.ID)
+
+	// Get user
+	usr, err := h.userService.GetByID(c.Context(), stored.UserID)
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(ErrorResponse{
+			Error:   "invalid_token",
+			Message: "User not found",
+		})
+	}
+
+	if usr.Disabled {
+		return c.Status(fiber.StatusForbidden).JSON(ErrorResponse{
+			Error:   "user_disabled",
+			Message: "Your account has been disabled",
+		})
+	}
+
+	// Generate new access token
+	accessToken, err := jwtutil.GenerateToken(usr.ID, usr.Username, h.jwtSecret, h.jwtExpiry)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{
+			Error:   "internal_error",
+			Message: "Failed to generate token",
+		})
+	}
+
+	// Generate new refresh token
+	newRefreshToken, err := h.createRefreshToken(c, usr.ID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{
+			Error:   "internal_error",
+			Message: "Failed to generate refresh token",
+		})
+	}
+
+	info := toUserInfo(usr)
+	return c.JSON(LoginResponse{
+		Token:        accessToken,
+		RefreshToken: newRefreshToken,
+		User:         &info,
+	})
+}
+
+// createRefreshToken generates and stores a new refresh token
+func (h *AuthHandler) createRefreshToken(c *fiber.Ctx, userID string) (string, error) {
+	raw, err := idgen.NewSecret(32)
+	if err != nil {
+		return "", err
+	}
+
+	tokenHash := hashToken(raw)
+	rt := &sqlite.RefreshToken{
+		ID:        idgen.NewUUID(),
+		UserID:    userID,
+		TokenHash: tokenHash,
+		ExpiresAt: time.Now().Add(h.refreshExpiry),
+		Revoked:   false,
+		CreatedAt: time.Now(),
+	}
+
+	if err := h.refreshRepo.Create(c.Context(), rt); err != nil {
+		return "", err
+	}
+
+	return raw, nil
+}
+
+// hashToken returns SHA-256 hex hash of a token string
+func hashToken(token string) string {
+	h := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(h[:])
 }
 
 // GetMe handles GET /api/me

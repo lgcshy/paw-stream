@@ -6,18 +6,20 @@ import (
 
 // Config holds all configuration for the API server
 type Config struct {
-	Server   ServerConfig   `mapstructure:"server"`
-	Log      LogConfig      `mapstructure:"log"`
-	DB       DBConfig       `mapstructure:"db"`
-	JWT      JWTConfig      `mapstructure:"jwt"`
-	MediaMTX MediaMTXConfig `mapstructure:"mediamtx"`
+	Server        ServerConfig   `mapstructure:"server"`
+	Log           LogConfig      `mapstructure:"log"`
+	DB            DBConfig       `mapstructure:"db"`
+	JWT           JWTConfig      `mapstructure:"jwt"`
+	MediaMTX      MediaMTXConfig `mapstructure:"mediamtx"`
+	EncryptionKey string         `mapstructure:"encryption_key"`
 }
 
 // ServerConfig holds HTTP server configuration
 type ServerConfig struct {
-	Port string `mapstructure:"port"`
-	Host string `mapstructure:"host"`
-	Mode string `mapstructure:"mode"` // development or production
+	Port         string `mapstructure:"port"`
+	Host         string `mapstructure:"host"`
+	Mode         string `mapstructure:"mode"`          // development or production
+	CORSOrigins  string `mapstructure:"cors_origins"`  // comma-separated allowed origins, "*" for all
 }
 
 // LogConfig holds logging configuration
@@ -41,8 +43,9 @@ type DBConfig struct {
 
 // JWTConfig holds JWT token configuration
 type JWTConfig struct {
-	Secret string        `mapstructure:"secret"`
-	Expiry time.Duration `mapstructure:"expiry"`
+	Secret        string        `mapstructure:"secret"`
+	Expiry        time.Duration `mapstructure:"expiry"`
+	RefreshExpiry time.Duration `mapstructure:"refresh_expiry"`
 }
 
 // MediaMTXConfig holds MediaMTX integration configuration

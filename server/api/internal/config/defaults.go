@@ -6,9 +6,10 @@ import "time"
 func DefaultConfig() *Config {
 	return &Config{
 		Server: ServerConfig{
-			Port: "3000",
-			Host: "0.0.0.0",
-			Mode: "development",
+			Port:        "3000",
+			Host:        "0.0.0.0",
+			Mode:        "development",
+			CORSOrigins: "*",
 		},
 		Log: LogConfig{
 			Level:      "info",
@@ -26,8 +27,9 @@ func DefaultConfig() *Config {
 			ConnMaxLifetime: 1 * time.Hour,
 		},
 		JWT: JWTConfig{
-			Secret: "change-me-in-production",
-			Expiry: 24 * time.Hour,
+			Secret:        "change-me-in-production",
+			Expiry:        15 * time.Minute,
+			RefreshExpiry: 30 * 24 * time.Hour,
 		},
 		MediaMTX: MediaMTXConfig{
 			URL: "http://localhost:8554",

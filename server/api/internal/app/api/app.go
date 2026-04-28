@@ -96,7 +96,7 @@ func (a *App) initServices() {
 
 	// Create services
 	a.userService = user.NewService(userRepo)
-	a.deviceService = device.NewService(deviceRepo)
+	a.deviceService = device.NewService(deviceRepo, a.cfg.EncryptionKey)
 	a.aclService = acl.NewService(a.userService, a.deviceService, a.cfg.JWT.Secret)
 
 	a.log.Info().Msg("services initialized")
@@ -104,8 +104,9 @@ func (a *App) initServices() {
 
 // initHandlers initializes HTTP handlers
 func (a *App) initHandlers() {
+	refreshRepo := sqlite.NewRefreshTokenRepository(a.db)
 	a.healthHandler = handlers.NewHealthHandler()
-	a.authHandler = handlers.NewAuthHandler(a.userService, a.cfg.JWT.Secret, a.cfg.JWT.Expiry)
+	a.authHandler = handlers.NewAuthHandler(a.userService, refreshRepo, a.cfg.JWT.Secret, a.cfg.JWT.Expiry, a.cfg.JWT.RefreshExpiry)
 	a.deviceHandler = handlers.NewDeviceHandler(a.deviceService)
 	a.pathHandler = handlers.NewPathHandler(a.deviceService)
 	a.mediamtxHandler = handlers.NewMediaMTXHandler(a.aclService, a.log)
@@ -126,7 +127,7 @@ func (a *App) initFiber() {
 	app.Use(middleware.Recovery(a.log))
 	app.Use(middleware.RequestID())
 	app.Use(middleware.Logger(a.log))
-	app.Use(middleware.CORS())
+	app.Use(middleware.CORS(a.cfg.Server.CORSOrigins))
 
 	a.fiber = app
 	a.log.Info().Msg("fiber app initialized")

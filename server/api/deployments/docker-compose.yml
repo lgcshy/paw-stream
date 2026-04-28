@@ -1,6 +1,19 @@
 version: '3.8'
 
 services:
+  web:
+    build:
+      context: ../../../web
+      dockerfile: Dockerfile
+    container_name: pawstream-web
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+    networks:
+      - pawstream
+
   api:
     build:
       context: ..
@@ -10,10 +23,16 @@ services:
       - "3000:3000"
     environment:
       - PAWSTREAM_SERVER_MODE=production
+      - PAWSTREAM_SERVER_CORS_ORIGINS=${CORS_ORIGINS:-*}
       - PAWSTREAM_LOG_LEVEL=info
       - PAWSTREAM_DB_PATH=/app/data/pawstream.db
       - PAWSTREAM_JWT_SECRET=${JWT_SECRET:-change-me-in-production}
+      - PAWSTREAM_JWT_EXPIRY=15m
+      - PAWSTREAM_JWT_REFRESH_EXPIRY=720h
+      - PAWSTREAM_ENCRYPTION_KEY=${ENCRYPTION_KEY:-}
       - PAWSTREAM_MEDIAMTX_URL=http://mediamtx:8554
+      - PAWSTREAM_MEDIAMTX_WEBRTC_URL=${MEDIAMTX_WEBRTC_URL:-http://localhost:8889}
+      - PAWSTREAM_MEDIAMTX_RTSP_URL=${MEDIAMTX_RTSP_URL:-rtsp://localhost:8554}
     volumes:
       - api-data:/app/data
       - api-logs:/app/logs
@@ -22,15 +41,19 @@ services:
       - pawstream
 
   mediamtx:
-    image: bluenviron/mediamtx:latest
+    image: bluenviron/mediamtx:latest-ffmpeg
     container_name: pawstream-mediamtx
     ports:
       - "8554:8554"     # RTSP
       - "1935:1935"     # RTMP
       - "8888:8888"     # HLS
-      - "8889:8889"     # WebRTC
-    volumes:
-      - ./mediamtx.yml:/mediamtx.yml
+      - "8889:8889"     # WebRTC HTTP
+      - "8890:8890/udp" # WebRTC UDP
+      - "8189:8189/udp" # WebRTC UDP
+    environment:
+      - MTX_AUTHMETHOD=http
+      - MTX_AUTHHTTPADDRESS=http://api:3000/mediamtx/auth
+      - MTX_WEBRTCADDITIONALHOSTS=${EXTERNAL_IP:-}
     restart: unless-stopped
     networks:
       - pawstream
