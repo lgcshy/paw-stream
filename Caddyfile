@@ -1,0 +1,16 @@
+{$DOMAIN:localhost} {
+	# Web UI
+	reverse_proxy /api/* api:3000
+	reverse_proxy /mediamtx/* api:3000
+	reverse_proxy /health api:3000
+	reverse_proxy /internal/* api:3000
+	reverse_proxy /metrics api:3000
+
+	# WebRTC (WHEP/WHIP)
+	reverse_proxy /stream/* mediamtx:8889
+	reverse_proxy /whep/* mediamtx:8889
+	reverse_proxy /whip/* mediamtx:8889
+
+	# Frontend (catch-all)
+	reverse_proxy web:80
+}

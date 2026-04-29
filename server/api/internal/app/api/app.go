@@ -40,6 +40,8 @@ type App struct {
 	pathHandler     *handlers.PathHandler
 	mediamtxHandler *handlers.MediaMTXHandler
 	configHandler   *handlers.ConfigHandler
+	adminHandler    *handlers.AdminHandler
+	metrics         *handlers.Metrics
 }
 
 // New creates a new API application
@@ -114,6 +116,8 @@ func (a *App) initHandlers() {
 	a.pathHandler = handlers.NewPathHandler(a.deviceService)
 	a.mediamtxHandler = handlers.NewMediaMTXHandler(a.aclService, a.deviceService, a.log)
 	a.configHandler = handlers.NewConfigHandler(a.cfg.MediaMTX.WebRTCURL, a.cfg.MediaMTX.RTSPURL)
+	a.adminHandler = handlers.NewAdminHandler(a.deviceService, a.userService)
+	a.metrics = handlers.NewMetrics()
 
 	a.log.Info().Msg("handlers initialized")
 }
@@ -131,6 +135,7 @@ func (a *App) initFiber() {
 	app.Use(middleware.RequestID())
 	app.Use(middleware.Logger(a.log))
 	app.Use(middleware.CORS(a.cfg.Server.CORSOrigins))
+	app.Use(a.metrics.Middleware())
 
 	a.fiber = app
 	a.log.Info().Msg("fiber app initialized")

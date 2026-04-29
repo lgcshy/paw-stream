@@ -1,6 +1,7 @@
 package api
 
 import (
+	"github.com/lgc/pawstream/api/internal/transport/http/handlers"
 	"github.com/lgc/pawstream/api/internal/transport/http/middleware"
 )
 
@@ -8,6 +9,9 @@ import (
 func (a *App) setupRoutes() {
 	// Health check (no auth required)
 	a.fiber.Get("/health", a.healthHandler.Check)
+
+	// Prometheus metrics (no auth required)
+	a.fiber.Get("/metrics", handlers.MetricsHandler())
 
 	// MediaMTX auth callback (no auth required)
 	a.fiber.Post("/mediamtx/auth", a.mediamtxHandler.Auth)
@@ -55,4 +59,10 @@ func (a *App) setupRoutes() {
 
 	// Path query
 	protected.Get("/paths", a.pathHandler.List)
+
+	// Device heartbeat (from edge client)
+	protected.Post("/devices/:id/heartbeat", a.adminHandler.Heartbeat)
+
+	// Admin dashboard
+	protected.Get("/admin/dashboard", a.adminHandler.Dashboard)
 }

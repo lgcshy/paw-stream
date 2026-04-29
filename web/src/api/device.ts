@@ -8,6 +8,7 @@ import type {
   UpdateDeviceRequest,
   UpdateDeviceResponse,
   RotateSecretResponse,
+  AdminDashboard,
 } from '@/types/api'
 
 export const deviceApi = {
@@ -52,5 +53,12 @@ export const deviceApi = {
    */
   async rotateSecret(id: string): Promise<RotateSecretResponse> {
     return apiClient.post<RotateSecretResponse>(`/api/devices/${id}/rotate-secret`)
+  },
+
+  /**
+   * Get admin dashboard data
+   */
+  async getAdminDashboard(): Promise<AdminDashboard> {
+    return apiClient.get<AdminDashboard>('/api/admin/dashboard')
   },
 }

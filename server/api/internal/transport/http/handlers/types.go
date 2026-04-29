@@ -79,6 +79,36 @@ type PathInfo struct {
 	DeviceLocation string `json:"device_location"`
 }
 
+// Admin API types
+
+type AdminDeviceInfo struct {
+	ID          string     `json:"id"`
+	Name        string     `json:"name"`
+	Location    string     `json:"location"`
+	PublishPath string     `json:"publish_path"`
+	OwnerUserID string     `json:"owner_user_id"`
+	Disabled    bool       `json:"disabled"`
+	IsOnline    bool       `json:"is_online"`
+	LastSeenAt  *time.Time `json:"last_seen_at,omitempty"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
+}
+
+type AdminDashboard struct {
+	TotalDevices  int               `json:"total_devices"`
+	OnlineDevices int               `json:"online_devices"`
+	Devices       []AdminDeviceInfo `json:"devices"`
+}
+
+// Heartbeat API types
+
+type HeartbeatRequest struct {
+	DeviceID string  `json:"device_id"`
+	Status   string  `json:"status"`
+	FPS      float64 `json:"fps,omitempty"`
+	Bitrate  int     `json:"bitrate,omitempty"`
+}
+
 // Error response types
 
 type ErrorResponse struct {

@@ -27,4 +27,7 @@ type Repository interface {
 
 	// ListSharedWith retrieves all devices shared with a user
 	ListSharedWith(ctx context.Context, userID string) ([]*Device, error)
+
+	// ListAll retrieves all devices (admin use)
+	ListAll(ctx context.Context) ([]*Device, error)
 }

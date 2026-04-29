@@ -86,6 +86,12 @@ func (r *DeviceRepository) ListByOwner(ctx context.Context, ownerUserID string) 
 	return r.queryDevices(ctx, query, ownerUserID)
 }
 
+// ListAll retrieves all devices (admin use)
+func (r *DeviceRepository) ListAll(ctx context.Context) ([]*device.Device, error) {
+	query := `SELECT ` + deviceColumns + ` FROM devices ORDER BY created_at DESC`
+	return r.queryDevices(ctx, query)
+}
+
 // ListSharedWith retrieves all devices shared with a user
 func (r *DeviceRepository) ListSharedWith(ctx context.Context, userID string) ([]*device.Device, error) {
 	query := `SELECT ` + deviceColumns + `

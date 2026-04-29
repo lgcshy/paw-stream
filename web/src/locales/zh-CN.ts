@@ -228,6 +228,27 @@ export default {
     avatarFailed: '上传失败',
   },
 
+  // Admin
+  admin: {
+    title: '管理仪表盘',
+    overview: '概览',
+    totalDevices: '设备总数',
+    onlineDevices: '在线设备',
+    offlineDevices: '离线设备',
+    allDevices: '所有设备',
+    owner: '所有者',
+    online: '在线',
+    offline: '离线',
+    enabled: '已启用',
+    disabled: '已禁用',
+    lastSeen: '最后在线',
+    never: '从未',
+    loadFailed: '加载仪表盘数据失败',
+    refreshSuccess: '数据已刷新',
+    refreshFailed: '刷新失败',
+    noPermission: '无管理员权限',
+  },
+
   // Confirm Dialog
   confirmDialog: {
     defaultTitle: '确认操作',

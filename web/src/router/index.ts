@@ -70,6 +70,12 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/ProfileView.vue'),
     meta: { requiresAuth: true, showBottomNav: true },
   },
+  {
+    path: '/admin',
+    name: 'Admin',
+    component: () => import('@/views/AdminView.vue'),
+    meta: { requiresAuth: true },
+  },
 ]
 
 const router = createRouter({

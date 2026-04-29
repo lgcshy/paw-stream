@@ -77,6 +77,27 @@ export interface PathInfo {
   device_location: string
 }
 
+// ============= Admin API =============
+
+export interface AdminDeviceInfo {
+  id: string
+  name: string
+  location: string
+  publish_path: string
+  owner_user_id: string
+  disabled: boolean
+  is_online: boolean
+  last_seen_at?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface AdminDashboard {
+  total_devices: number
+  online_devices: number
+  devices: AdminDeviceInfo[]
+}
+
 // ============= Error Response =============
 
 export interface ApiError {

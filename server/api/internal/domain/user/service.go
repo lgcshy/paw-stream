@@ -133,6 +133,18 @@ func (s *Service) Update(ctx context.Context, id string, input UpdateUserInput) 
 	return user, nil
 }
 
+// IsFirstUser checks if the given user ID is the first registered user (admin)
+func (s *Service) IsFirstUser(ctx context.Context, userID string) (bool, error) {
+	users, err := s.repo.List(ctx, 1, 0)
+	if err != nil {
+		return false, err
+	}
+	if len(users) == 0 {
+		return false, nil
+	}
+	return users[0].ID == userID, nil
+}
+
 // UpdateAvatar updates a user's avatar path
 func (s *Service) UpdateAvatar(ctx context.Context, id string, avatarPath string) (*User, error) {
 	user, err := s.GetByID(ctx, id)

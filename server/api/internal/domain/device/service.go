@@ -238,3 +238,8 @@ func (s *Service) SetOnlineStatus(ctx context.Context, publishPath string, onlin
 func (s *Service) ListSharedWith(ctx context.Context, userID string) ([]*Device, error) {
 	return s.repo.ListSharedWith(ctx, userID)
 }
+
+// ListAll retrieves all devices (admin use)
+func (s *Service) ListAll(ctx context.Context) ([]*Device, error) {
+	return s.repo.ListAll(ctx)
+}

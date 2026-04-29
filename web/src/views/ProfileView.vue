@@ -52,6 +52,11 @@
 
       <!-- Actions -->
       <van-cell-group inset :title="$t('profile.actions')">
+        <van-cell :title="$t('admin.title')" is-link @click="router.push('/admin')">
+          <template #icon>
+            <van-icon name="chart-trending-o" color="#1989fa" />
+          </template>
+        </van-cell>
         <van-cell :title="$t('profile.about')" is-link @click="handleAbout">
           <template #icon>
             <van-icon name="info-o" color="#1989fa" />

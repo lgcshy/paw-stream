@@ -230,6 +230,27 @@ export default {
     avatarFailed: 'Upload failed',
   },
 
+  // Admin
+  admin: {
+    title: 'Admin Dashboard',
+    overview: 'Overview',
+    totalDevices: 'Total Devices',
+    onlineDevices: 'Online Devices',
+    offlineDevices: 'Offline Devices',
+    allDevices: 'All Devices',
+    owner: 'Owner',
+    online: 'Online',
+    offline: 'Offline',
+    enabled: 'Enabled',
+    disabled: 'Disabled',
+    lastSeen: 'Last Seen',
+    never: 'Never',
+    loadFailed: 'Failed to load dashboard data',
+    refreshSuccess: 'Data refreshed',
+    refreshFailed: 'Refresh failed',
+    noPermission: 'Admin access required',
+  },
+
   // Confirm Dialog
   confirmDialog: {
     defaultTitle: 'Confirm',

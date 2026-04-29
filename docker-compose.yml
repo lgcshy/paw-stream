@@ -1,0 +1,75 @@
+services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: pawstream-caddy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - web
+    restart: unless-stopped
+    networks:
+      - pawstream
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: pawstream-web
+    restart: unless-stopped
+    networks:
+      - pawstream
+
+  api:
+    build:
+      context: ./server/api
+      dockerfile: deployments/Dockerfile
+    container_name: pawstream-api
+    environment:
+      - PAWSTREAM_SERVER_MODE=production
+      - PAWSTREAM_SERVER_CORS_ORIGINS=${CORS_ORIGINS:-*}
+      - PAWSTREAM_LOG_LEVEL=info
+      - PAWSTREAM_DB_PATH=/app/data/pawstream.db
+      - PAWSTREAM_JWT_SECRET=${JWT_SECRET}
+      - PAWSTREAM_JWT_EXPIRY=15m
+      - PAWSTREAM_JWT_REFRESH_EXPIRY=720h
+      - PAWSTREAM_ENCRYPTION_KEY=${ENCRYPTION_KEY:-}
+      - PAWSTREAM_MEDIAMTX_URL=http://mediamtx:8554
+      - PAWSTREAM_MEDIAMTX_WEBRTC_URL=${MEDIAMTX_WEBRTC_URL}
+      - PAWSTREAM_MEDIAMTX_RTSP_URL=rtsp://${DOMAIN}:8554
+    volumes:
+      - api-data:/app/data
+    restart: unless-stopped
+    networks:
+      - pawstream
+
+  mediamtx:
+    image: bluenviron/mediamtx:latest-ffmpeg
+    container_name: pawstream-mediamtx
+    ports:
+      - "8554:8554"     # RTSP
+      - "1935:1935"     # RTMP
+      - "8890:8890/udp" # WebRTC UDP (SRTP)
+      - "8189:8189/udp" # WebRTC UDP (ICE)
+    environment:
+      - MTX_AUTHMETHOD=http
+      - MTX_AUTHHTTPADDRESS=http://api:3000/mediamtx/auth
+      - MTX_WEBRTCADDITIONALHOSTS=${DOMAIN}
+    restart: unless-stopped
+    networks:
+      - pawstream
+    depends_on:
+      - api
+
+volumes:
+  api-data:
+  caddy-data:
+  caddy-config:
+
+networks:
+  pawstream:
+    driver: bridge
