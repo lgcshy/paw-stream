@@ -1,10 +1,10 @@
 <template>
   <div class="device-detail-page">
-    <van-nav-bar title="设备详情" left-arrow @click-left="router.back()" fixed placeholder />
+    <van-nav-bar :title="$t('deviceDetail.title')" left-arrow @click-left="router.back()" fixed placeholder />
 
     <!-- Loading State -->
     <div v-if="loading && !device" class="loading-container">
-      <van-loading type="spinner" size="40px">加载中...</van-loading>
+      <van-loading type="spinner" size="40px">{{ $t('common.loading') }}</van-loading>
     </div>
 
     <!-- Device Details -->
@@ -12,25 +12,25 @@
       <!-- Rotated Secret Display -->
       <div v-if="rotatedSecret" class="secret-section">
         <van-notice-bar type="success" :scrollable="false">
-          <template #default> 密钥轮换成功！新密钥如下 </template>
+          <template #default> {{ $t('deviceDetail.secretRotatedNotice') }} </template>
         </van-notice-bar>
         <SecretDisplay :secret="rotatedSecret" />
-        <van-button type="default" block round @click="rotatedSecret = null">关闭</van-button>
+        <van-button type="default" block round @click="rotatedSecret = null">{{ $t('common.close') }}</van-button>
       </div>
 
       <!-- Device Info -->
-      <van-cell-group inset title="基本信息">
-        <van-cell title="设备名称" :value="device.name" />
-        <van-cell title="位置" :value="device.location || '未设置'" />
-        <van-cell title="推流路径" :value="device.publish_path" />
-        <van-cell title="设备ID" :value="device.id" />
-        <van-cell title="创建时间" :value="formatDateTime(device.created_at)" />
-        <van-cell title="更新时间" :value="formatDateTime(device.updated_at)" />
+      <van-cell-group inset :title="$t('deviceDetail.basicInfo')">
+        <van-cell :title="$t('deviceDetail.deviceName')" :value="device.name" />
+        <van-cell :title="$t('deviceDetail.location')" :value="device.location || $t('common.notSet')" />
+        <van-cell :title="$t('deviceDetail.publishPath')" :value="device.publish_path" />
+        <van-cell :title="$t('deviceDetail.deviceId')" :value="device.id" />
+        <van-cell :title="$t('deviceDetail.createdTime')" :value="formatDateTime(device.created_at)" />
+        <van-cell :title="$t('deviceDetail.updatedTime')" :value="formatDateTime(device.updated_at)" />
       </van-cell-group>
 
       <!-- Device Status -->
-      <van-cell-group inset title="设备状态">
-        <van-cell title="启用状态">
+      <van-cell-group inset :title="$t('deviceDetail.status')">
+        <van-cell :title="$t('deviceDetail.enableStatus')">
           <template #right-icon>
             <van-switch v-model="deviceEnabled" size="24" @change="handleToggleStatus" :loading="toggleLoading" />
           </template>
@@ -38,23 +38,23 @@
       </van-cell-group>
 
       <!-- Actions -->
-      <van-cell-group inset title="操作">
-        <van-cell title="编辑设备" is-link @click="handleEdit">
+      <van-cell-group inset :title="$t('deviceDetail.actions')">
+        <van-cell :title="$t('deviceDetail.editDevice')" is-link @click="handleEdit">
           <template #icon>
             <van-icon name="edit" color="#1989fa" />
           </template>
         </van-cell>
-        <van-cell title="轮换密钥" is-link @click="handleRotateSecret">
+        <van-cell :title="$t('deviceDetail.rotateSecret')" is-link @click="handleRotateSecret">
           <template #icon>
             <van-icon name="replay" color="#ff976a" />
           </template>
         </van-cell>
-        <van-cell v-if="deviceEnabled" title="观看直播" is-link @click="handlePlayStream">
+        <van-cell v-if="deviceEnabled" :title="$t('deviceDetail.watchStream')" is-link @click="handlePlayStream">
           <template #icon>
             <van-icon name="play-circle" color="#07c160" />
           </template>
         </van-cell>
-        <van-cell title="删除设备" is-link @click="handleDelete">
+        <van-cell :title="$t('deviceDetail.deleteDevice')" is-link @click="handleDelete">
           <template #icon>
             <van-icon name="delete" color="#ee0a24" />
           </template>
@@ -65,10 +65,10 @@
     <!-- Confirm Dialog for Delete -->
     <ConfirmDialog
       v-model:show="showDeleteConfirm"
-      title="删除设备"
-      message="确定要删除这个设备吗？删除后无法恢复，推流将立即停止。"
-      confirm-text="删除"
-      cancel-text="取消"
+      :title="$t('deviceDetail.deleteConfirmTitle')"
+      :message="$t('deviceDetail.deleteConfirmMessage')"
+      :confirm-text="$t('common.delete')"
+      :cancel-text="$t('common.cancel')"
       danger
       @confirm="confirmDelete"
     />
@@ -76,10 +76,10 @@
     <!-- Confirm Dialog for Rotate Secret -->
     <ConfirmDialog
       v-model:show="showRotateConfirm"
-      title="轮换密钥"
-      message="轮换密钥后，旧密钥将立即失效。请确保已准备好更新客户端配置。"
-      confirm-text="轮换"
-      cancel-text="取消"
+      :title="$t('deviceDetail.rotateConfirmTitle')"
+      :message="$t('deviceDetail.rotateConfirmMessage')"
+      :confirm-text="$t('deviceDetail.rotateButton')"
+      :cancel-text="$t('common.cancel')"
       @confirm="confirmRotateSecret"
     />
   </div>
@@ -93,7 +93,9 @@ import { showSuccessToast, showFailToast } from 'vant'
 import SecretDisplay from '@/components/SecretDisplay.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import type { DeviceInfo } from '@/types/api'
+import { useI18n } from 'vue-i18n'
 
+const { t } = useI18n()
 const router = useRouter()
 const route = useRoute()
 const deviceStore = useDeviceStore()
@@ -141,11 +143,11 @@ async function confirmDelete() {
   loading.value = true
   try {
     await deviceStore.deleteDevice(deviceId.value)
-    showSuccessToast('设备已删除')
+    showSuccessToast(t('deviceDetail.deleteSuccess'))
     router.push('/devices')
   } catch (error: any) {
     console.error('Delete failed:', error)
-    showFailToast(error.message || '删除失败')
+    showFailToast(error.message || t('deviceDetail.deleteFailed'))
   } finally {
     loading.value = false
   }
@@ -160,10 +162,10 @@ async function confirmRotateSecret() {
   try {
     const response = await deviceStore.rotateSecret(deviceId.value)
     rotatedSecret.value = response.new_secret
-    showSuccessToast('密钥轮换成功')
+    showSuccessToast(t('deviceDetail.rotateSuccess'))
   } catch (error: any) {
     console.error('Rotate secret failed:', error)
-    showFailToast(error.message || '轮换失败')
+    showFailToast(error.message || t('deviceDetail.rotateFailed'))
   } finally {
     loading.value = false
   }
@@ -178,12 +180,12 @@ async function handleToggleStatus() {
     if (device.value) {
       device.value.disabled = !deviceEnabled.value
     }
-    showSuccessToast(deviceEnabled.value ? '设备已启用' : '设备已禁用')
+    showSuccessToast(deviceEnabled.value ? t('deviceDetail.deviceEnabled') : t('deviceDetail.deviceDisabled'))
   } catch (error: any) {
     console.error('Toggle status failed:', error)
     // Revert the switch
     deviceEnabled.value = !deviceEnabled.value
-    showFailToast(error.message || '状态更新失败')
+    showFailToast(error.message || t('deviceDetail.statusUpdateFailed'))
   } finally {
     toggleLoading.value = false
   }
@@ -197,7 +199,7 @@ onMounted(async () => {
     deviceEnabled.value = !device.value.disabled
   } catch (error: any) {
     console.error('Load device failed:', error)
-    showFailToast(error.message || '加载设备信息失败')
+    showFailToast(error.message || t('deviceDetail.loadFailed'))
     router.back()
   } finally {
     loading.value = false

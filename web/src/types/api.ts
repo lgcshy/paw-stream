@@ -37,6 +37,8 @@ export interface DeviceInfo {
   location: string
   publish_path: string
   disabled: boolean
+  is_online: boolean
+  last_seen_at?: string
   created_at: string
   updated_at: string
 }

@@ -8,20 +8,23 @@ import (
 	"github.com/lgc/pawstream/api/internal/domain/user"
 	"github.com/lgc/pawstream/api/internal/pkg/errors"
 	"github.com/lgc/pawstream/api/internal/pkg/jwtutil"
+	"github.com/lgc/pawstream/api/internal/store/sqlite"
 )
 
 // Service handles access control logic
 type Service struct {
 	userService   *user.Service
 	deviceService *device.Service
+	shareRepo     *sqlite.DeviceShareRepository
 	jwtSecret     string
 }
 
 // NewService creates a new ACL service
-func NewService(userService *user.Service, deviceService *device.Service, jwtSecret string) *Service {
+func NewService(userService *user.Service, deviceService *device.Service, shareRepo *sqlite.DeviceShareRepository, jwtSecret string) *Service {
 	return &Service{
 		userService:   userService,
 		deviceService: deviceService,
+		shareRepo:     shareRepo,
 		jwtSecret:     jwtSecret,
 	}
 }
@@ -150,6 +153,18 @@ func (s *Service) authorizeRead(ctx context.Context, req AuthRequest) (*AuthResu
 			return &AuthResult{
 				Allowed: true,
 				Reason:  "authorized",
+			}, nil
+		}
+	}
+
+	// Check if device is shared with user
+	dev, err := s.deviceService.GetByPublishPath(ctx, req.Path)
+	if err == nil && dev != nil && !dev.Disabled && s.shareRepo != nil {
+		shared, err := s.shareRepo.IsSharedWith(ctx, dev.ID, usr.ID)
+		if err == nil && shared {
+			return &AuthResult{
+				Allowed: true,
+				Reason:  "authorized via share",
 			}, nil
 		}
 	}

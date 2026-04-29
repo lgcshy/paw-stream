@@ -31,6 +31,7 @@ type App struct {
 	userService   *user.Service
 	deviceService *device.Service
 	aclService    *acl.Service
+	shareRepo     *sqlite.DeviceShareRepository
 
 	// Handlers
 	healthHandler   *handlers.HealthHandler
@@ -93,11 +94,13 @@ func (a *App) initServices() {
 	// Create repositories
 	userRepo := sqlite.NewUserRepository(a.db)
 	deviceRepo := sqlite.NewDeviceRepository(a.db)
+	shareRepo := sqlite.NewDeviceShareRepository(a.db)
 
 	// Create services
 	a.userService = user.NewService(userRepo)
 	a.deviceService = device.NewService(deviceRepo, a.cfg.EncryptionKey)
-	a.aclService = acl.NewService(a.userService, a.deviceService, a.cfg.JWT.Secret)
+	a.aclService = acl.NewService(a.userService, a.deviceService, shareRepo, a.cfg.JWT.Secret)
+	a.shareRepo = shareRepo
 
 	a.log.Info().Msg("services initialized")
 }
@@ -107,9 +110,9 @@ func (a *App) initHandlers() {
 	refreshRepo := sqlite.NewRefreshTokenRepository(a.db)
 	a.healthHandler = handlers.NewHealthHandler()
 	a.authHandler = handlers.NewAuthHandler(a.userService, refreshRepo, a.cfg.JWT.Secret, a.cfg.JWT.Expiry, a.cfg.JWT.RefreshExpiry)
-	a.deviceHandler = handlers.NewDeviceHandler(a.deviceService)
+	a.deviceHandler = handlers.NewDeviceHandler(a.deviceService, a.userService, a.shareRepo)
 	a.pathHandler = handlers.NewPathHandler(a.deviceService)
-	a.mediamtxHandler = handlers.NewMediaMTXHandler(a.aclService, a.log)
+	a.mediamtxHandler = handlers.NewMediaMTXHandler(a.aclService, a.deviceService, a.log)
 	a.configHandler = handlers.NewConfigHandler(a.cfg.MediaMTX.WebRTCURL, a.cfg.MediaMTX.RTSPURL)
 
 	a.log.Info().Msg("handlers initialized")

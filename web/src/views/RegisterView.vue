@@ -1,11 +1,11 @@
 <template>
   <div class="register-page">
-    <van-nav-bar title="注册账号" left-arrow @click-left="router.back()" />
+    <van-nav-bar :title="$t('register.title')" left-arrow @click-left="router.back()" />
 
     <div class="register-container">
       <div class="register-header">
         <h1>🐾 PawStream</h1>
-        <p>创建你的账号开始使用</p>
+        <p>{{ $t('register.subtitle') }}</p>
       </div>
 
       <van-form @submit="handleRegister">
@@ -14,12 +14,12 @@
           <van-field
             v-model="form.username"
             name="username"
-            label="用户名"
-            placeholder="请输入用户名"
+            :label="$t('register.username')"
+            :placeholder="$t('register.usernamePlaceholder')"
             clearable
             :rules="[
-              { required: true, message: '请输入用户名' },
-              { pattern: /^[a-zA-Z0-9_]{3,20}$/, message: '用户名为3-20位字母、数字或下划线' },
+              { required: true, message: $t('register.usernameRequired') },
+              { pattern: /^[a-zA-Z0-9_]{3,20}$/, message: $t('register.usernamePattern') },
             ]"
           />
         </van-cell-group>
@@ -29,10 +29,10 @@
           <van-field
             v-model="form.nickname"
             name="nickname"
-            label="昵称"
-            placeholder="请输入昵称（可选）"
+            :label="$t('register.nickname')"
+            :placeholder="$t('register.nicknamePlaceholder')"
             clearable
-            :rules="[{ pattern: /^.{0,50}$/, message: '昵称不能超过50个字符' }]"
+            :rules="[{ pattern: /^.{0,50}$/, message: $t('register.nicknameMaxLength') }]"
           />
         </van-cell-group>
 
@@ -42,12 +42,12 @@
             v-model="form.password"
             name="password"
             type="password"
-            label="密码"
-            placeholder="请输入密码"
+            :label="$t('register.password')"
+            :placeholder="$t('register.passwordPlaceholder')"
             clearable
             :rules="[
-              { required: true, message: '请输入密码' },
-              { validator: validatePassword, message: '密码至少8位，包含字母和数字' },
+              { required: true, message: $t('register.passwordRequired') },
+              { validator: validatePassword, message: $t('register.passwordPattern') },
             ]"
           />
         </van-cell-group>
@@ -58,19 +58,19 @@
             v-model="form.confirmPassword"
             name="confirmPassword"
             type="password"
-            label="确认密码"
-            placeholder="请再次输入密码"
+            :label="$t('register.confirmPassword')"
+            :placeholder="$t('register.confirmPasswordPlaceholder')"
             clearable
             :rules="[
-              { required: true, message: '请再次输入密码' },
-              { validator: validateConfirmPassword, message: '两次输入的密码不一致' },
+              { required: true, message: $t('register.confirmPasswordRequired') },
+              { validator: validateConfirmPassword, message: $t('register.confirmPasswordMismatch') },
             ]"
           />
         </van-cell-group>
 
         <!-- Password Strength Indicator -->
         <div v-if="form.password" class="password-strength">
-          <div class="strength-label">密码强度:</div>
+          <div class="strength-label">{{ $t('register.passwordStrength') }}</div>
           <div class="strength-bar">
             <div
               class="strength-fill"
@@ -86,15 +86,15 @@
         <!-- Submit Button -->
         <div class="register-actions">
           <van-button round block type="primary" native-type="submit" :loading="loading">
-            注册
+            {{ $t('register.submit') }}
           </van-button>
         </div>
       </van-form>
 
       <!-- Login Link -->
       <div class="register-footer">
-        <span>已有账号？</span>
-        <router-link to="/login" class="login-link">立即登录</router-link>
+        <span>{{ $t('register.hasAccount') }}</span>
+        <router-link to="/login" class="login-link">{{ $t('register.goLogin') }}</router-link>
       </div>
     </div>
   </div>
@@ -105,7 +105,9 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { showSuccessToast, showFailToast } from 'vant'
+import { useI18n } from 'vue-i18n'
 
+const { t } = useI18n()
 const router = useRouter()
 const authStore = useAuthStore()
 
@@ -162,9 +164,9 @@ const passwordStrengthWidth = computed(() => {
 
 const passwordStrengthText = computed(() => {
   const strength = passwordStrength.value
-  if (strength === 'weak') return '弱'
-  if (strength === 'medium') return '中'
-  if (strength === 'strong') return '强'
+  if (strength === 'weak') return t('register.strengthWeak')
+  if (strength === 'medium') return t('register.strengthMedium')
+  if (strength === 'strong') return t('register.strengthStrong')
   return ''
 })
 
@@ -174,13 +176,13 @@ async function handleRegister() {
   try {
     await authStore.register(form.value.username, form.value.password, form.value.nickname || undefined)
 
-    showSuccessToast('注册成功！')
+    showSuccessToast(t('register.success'))
 
     // Navigate to stream list
     router.push('/streams')
   } catch (error: any) {
     console.error('Register failed:', error)
-    showFailToast(error.message || '注册失败，请重试')
+    showFailToast(error.message || t('register.failed'))
   } finally {
     loading.value = false
   }

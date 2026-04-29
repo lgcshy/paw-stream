@@ -21,4 +21,10 @@ type Repository interface {
 
 	// Delete deletes a device by ID
 	Delete(ctx context.Context, id string) error
+
+	// SetOnlineStatus updates the device online status
+	SetOnlineStatus(ctx context.Context, publishPath string, online bool) error
+
+	// ListSharedWith retrieves all devices shared with a user
+	ListSharedWith(ctx context.Context, userID string) ([]*Device, error)
 }

@@ -4,7 +4,9 @@ import { useRouter, useRoute } from 'vue-router'
 import { Form, Field, Button, CellGroup, showFailToast, showSuccessToast } from 'vant'
 import { useAuthStore } from '@/stores/auth'
 import { ApiClientError } from '@/api'
+import { useI18n } from 'vue-i18n'
 
+const { t } = useI18n()
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
@@ -15,14 +17,14 @@ const loading = ref(false)
 
 const onSubmit = async () => {
   if (!username.value || !password.value) {
-    showFailToast('请输入用户名和密码')
+    showFailToast(t('login.inputRequired'))
     return
   }
 
   loading.value = true
   try {
     await authStore.login(username.value, password.value)
-    showSuccessToast('登录成功')
+    showSuccessToast(t('login.success'))
 
     // Redirect to original destination or streams page
     const redirect = (route.query.redirect as string) || '/streams'
@@ -30,14 +32,14 @@ const onSubmit = async () => {
   } catch (error) {
     if (error instanceof ApiClientError) {
       if (error.statusCode === 401) {
-        showFailToast('用户名或密码错误')
+        showFailToast(t('login.invalidCredentials'))
       } else if (error.statusCode === 403) {
-        showFailToast('账号已被禁用')
+        showFailToast(t('login.accountDisabled'))
       } else {
-        showFailToast(error.message || '登录失败,请重试')
+        showFailToast(error.message || t('login.failed'))
       }
     } else {
-      showFailToast('网络错误,请稍后重试')
+      showFailToast(t('common.networkError'))
     }
   } finally {
     loading.value = false
@@ -50,7 +52,7 @@ const onSubmit = async () => {
     <div class="login-container">
       <div class="logo">
         <h1>🐾 PawStream</h1>
-        <p>宠物实时监控系统</p>
+        <p>{{ $t('app.subtitle') }}</p>
       </div>
 
       <Form @submit="onSubmit">
@@ -58,30 +60,30 @@ const onSubmit = async () => {
           <Field
             v-model="username"
             name="username"
-            label="用户名"
-            placeholder="请输入用户名"
-            :rules="[{ required: true, message: '请填写用户名' }]"
+            :label="$t('login.username')"
+            :placeholder="$t('login.usernamePlaceholder')"
+            :rules="[{ required: true, message: $t('login.usernameRequired') }]"
           />
           <Field
             v-model="password"
             type="password"
             name="password"
-            label="密码"
-            placeholder="请输入密码"
-            :rules="[{ required: true, message: '请填写密码' }]"
+            :label="$t('login.password')"
+            :placeholder="$t('login.passwordPlaceholder')"
+            :rules="[{ required: true, message: $t('login.passwordRequired') }]"
           />
         </CellGroup>
         <div class="button-container">
           <Button round block type="primary" native-type="submit" :loading="loading" :disabled="loading">
-            登录
+            {{ $t('login.submit') }}
           </Button>
         </div>
       </Form>
 
       <!-- Register Link -->
       <div class="register-link">
-        <span>还没有账号？</span>
-        <router-link to="/register" class="link-text">立即注册</router-link>
+        <span>{{ $t('login.noAccount') }}</span>
+        <router-link to="/register" class="link-text">{{ $t('login.goRegister') }}</router-link>
       </div>
     </div>
   </div>
@@ -107,7 +109,7 @@ const onSubmit = async () => {
   left: 0;
   width: 100%;
   height: 100%;
-  background: 
+  background:
     radial-gradient(circle at 20% 50%, rgba(56, 239, 125, 0.08) 0%, transparent 50%),
     radial-gradient(circle at 80% 80%, rgba(17, 153, 142, 0.08) 0%, transparent 50%);
   animation: float 20s ease-in-out infinite;

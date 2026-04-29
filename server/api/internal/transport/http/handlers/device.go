@@ -1,21 +1,45 @@
 package handlers
 
 import (
+	"time"
+
 	"github.com/gofiber/fiber/v2"
 
 	"github.com/lgc/pawstream/api/internal/domain/device"
+	"github.com/lgc/pawstream/api/internal/domain/user"
 	"github.com/lgc/pawstream/api/internal/pkg/errors"
+	"github.com/lgc/pawstream/api/internal/pkg/idgen"
+	"github.com/lgc/pawstream/api/internal/store/sqlite"
 )
+
+// toDeviceInfo converts a domain device to a DeviceInfo response
+func toDeviceInfo(d *device.Device) DeviceInfo {
+	return DeviceInfo{
+		ID:          d.ID,
+		Name:        d.Name,
+		Location:    d.Location,
+		PublishPath: d.PublishPath,
+		Disabled:    d.Disabled,
+		IsOnline:    d.IsOnline,
+		LastSeenAt:  d.LastSeenAt,
+		CreatedAt:   d.CreatedAt,
+		UpdatedAt:   d.UpdatedAt,
+	}
+}
 
 // DeviceHandler handles device management requests
 type DeviceHandler struct {
 	deviceService *device.Service
+	userService   *user.Service
+	shareRepo     *sqlite.DeviceShareRepository
 }
 
 // NewDeviceHandler creates a new device handler
-func NewDeviceHandler(deviceService *device.Service) *DeviceHandler {
+func NewDeviceHandler(deviceService *device.Service, userService *user.Service, shareRepo *sqlite.DeviceShareRepository) *DeviceHandler {
 	return &DeviceHandler{
 		deviceService: deviceService,
+		userService:   userService,
+		shareRepo:     shareRepo,
 	}
 }
 
@@ -146,16 +170,9 @@ func (h *DeviceHandler) Create(c *fiber.Ctx) error {
 	}
 
 	// Return device info with secret (only once!)
+	info := toDeviceInfo(newDevice)
 	return c.Status(fiber.StatusCreated).JSON(CreateDeviceResponse{
-		Device: &DeviceInfo{
-			ID:          newDevice.ID,
-			Name:        newDevice.Name,
-			Location:    newDevice.Location,
-			PublishPath: newDevice.PublishPath,
-			Disabled:    newDevice.Disabled,
-			CreatedAt:   newDevice.CreatedAt,
-			UpdatedAt:   newDevice.UpdatedAt,
-		},
+		Device: &info,
 		Secret: deviceSecret.Secret,
 	})
 }
@@ -185,15 +202,8 @@ func (h *DeviceHandler) List(c *fiber.Ctx) error {
 	// Convert to response format (exclude secrets)
 	deviceInfos := make([]*DeviceInfo, len(devices))
 	for i, d := range devices {
-		deviceInfos[i] = &DeviceInfo{
-			ID:          d.ID,
-			Name:        d.Name,
-			Location:    d.Location,
-			PublishPath: d.PublishPath,
-			Disabled:    d.Disabled,
-			CreatedAt:   d.CreatedAt,
-			UpdatedAt:   d.UpdatedAt,
-		}
+		info := toDeviceInfo(d)
+		deviceInfos[i] = &info
 	}
 
 	return c.JSON(deviceInfos)
@@ -249,15 +259,7 @@ func (h *DeviceHandler) Get(c *fiber.Ctx) error {
 	}
 
 	// Return device info (exclude secret)
-	return c.JSON(DeviceInfo{
-		ID:          dev.ID,
-		Name:        dev.Name,
-		Location:    dev.Location,
-		PublishPath: dev.PublishPath,
-		Disabled:    dev.Disabled,
-		CreatedAt:   dev.CreatedAt,
-		UpdatedAt:   dev.UpdatedAt,
-	})
+	return c.JSON(toDeviceInfo(dev))
 }
 
 // Update handles PUT /api/devices/:id
@@ -333,15 +335,7 @@ func (h *DeviceHandler) Update(c *fiber.Ctx) error {
 	}
 
 	// Return updated device info
-	return c.JSON(DeviceInfo{
-		ID:          updatedDevice.ID,
-		Name:        updatedDevice.Name,
-		Location:    updatedDevice.Location,
-		PublishPath: updatedDevice.PublishPath,
-		Disabled:    updatedDevice.Disabled,
-		CreatedAt:   updatedDevice.CreatedAt,
-		UpdatedAt:   updatedDevice.UpdatedAt,
-	})
+	return c.JSON(toDeviceInfo(updatedDevice))
 }
 
 // Delete handles DELETE /api/devices/:id
@@ -466,4 +460,134 @@ func (h *DeviceHandler) RotateSecret(c *fiber.Ctx) error {
 		Secret:        newSecret.Secret,
 		SecretVersion: dev.SecretVersion + 1,
 	})
+}
+
+// ShareDevice handles POST /api/devices/:id/share
+func (h *DeviceHandler) ShareDevice(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(string)
+	deviceID := c.Params("id")
+
+	var req struct {
+		Username string `json:"username"`
+	}
+	if err := c.BodyParser(&req); err != nil || req.Username == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(ErrorResponse{
+			Error:   "validation_error",
+			Message: "Username is required",
+		})
+	}
+
+	// Verify ownership
+	dev, err := h.deviceService.GetByID(c.Context(), deviceID)
+	if err != nil || dev == nil || dev.OwnerUserID != userID {
+		return c.Status(fiber.StatusNotFound).JSON(ErrorResponse{
+			Error:   "device_not_found",
+			Message: "Device not found",
+		})
+	}
+
+	// Find target user
+	targetUser, err := h.userService.GetByUsername(c.Context(), req.Username)
+	if err != nil || targetUser == nil {
+		return c.Status(fiber.StatusNotFound).JSON(ErrorResponse{
+			Error:   "user_not_found",
+			Message: "User not found",
+		})
+	}
+
+	if targetUser.ID == userID {
+		return c.Status(fiber.StatusBadRequest).JSON(ErrorResponse{
+			Error:   "validation_error",
+			Message: "Cannot share with yourself",
+		})
+	}
+
+	share := &sqlite.DeviceShare{
+		ID:             idgen.NewUUID(),
+		DeviceID:       deviceID,
+		SharedByUserID: userID,
+		SharedToUserID: targetUser.ID,
+		CreatedAt:      time.Now(),
+	}
+
+	if err := h.shareRepo.Create(c.Context(), share); err != nil {
+		return c.Status(fiber.StatusConflict).JSON(ErrorResponse{
+			Error:   "already_shared",
+			Message: "Device already shared with this user",
+		})
+	}
+
+	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
+		"id":       share.ID,
+		"username": targetUser.Username,
+		"nickname": targetUser.Nickname,
+	})
+}
+
+// UnshareDevice handles DELETE /api/devices/:id/share/:userId
+func (h *DeviceHandler) UnshareDevice(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(string)
+	deviceID := c.Params("id")
+	targetUserID := c.Params("userId")
+
+	// Verify ownership
+	dev, err := h.deviceService.GetByID(c.Context(), deviceID)
+	if err != nil || dev == nil || dev.OwnerUserID != userID {
+		return c.Status(fiber.StatusNotFound).JSON(ErrorResponse{
+			Error:   "device_not_found",
+			Message: "Device not found",
+		})
+	}
+
+	if err := h.shareRepo.Delete(c.Context(), deviceID, targetUserID); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{
+			Error:   "internal_error",
+			Message: "Failed to remove share",
+		})
+	}
+
+	return c.SendStatus(fiber.StatusNoContent)
+}
+
+// ListShares handles GET /api/devices/:id/shares
+func (h *DeviceHandler) ListShares(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(string)
+	deviceID := c.Params("id")
+
+	// Verify ownership
+	dev, err := h.deviceService.GetByID(c.Context(), deviceID)
+	if err != nil || dev == nil || dev.OwnerUserID != userID {
+		return c.Status(fiber.StatusNotFound).JSON(ErrorResponse{
+			Error:   "device_not_found",
+			Message: "Device not found",
+		})
+	}
+
+	shares, err := h.shareRepo.ListByDevice(c.Context(), deviceID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{
+			Error:   "internal_error",
+			Message: "Failed to list shares",
+		})
+	}
+
+	// Build response with user info
+	var result []fiber.Map
+	for _, s := range shares {
+		u, _ := h.userService.GetByID(c.Context(), s.SharedToUserID)
+		entry := fiber.Map{
+			"user_id":    s.SharedToUserID,
+			"created_at": s.CreatedAt,
+		}
+		if u != nil {
+			entry["username"] = u.Username
+			entry["nickname"] = u.Nickname
+		}
+		result = append(result, entry)
+	}
+
+	if result == nil {
+		result = []fiber.Map{}
+	}
+	return c.JSON(result)
 }

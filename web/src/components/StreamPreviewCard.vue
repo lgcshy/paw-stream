@@ -97,9 +97,9 @@ function stopPreview() {
     </div>
     <div class="preview-info">
       <div class="preview-title">{{ stream.name }}</div>
-      <div class="preview-location">{{ stream.location || '未设置' }}</div>
+      <div class="preview-location">{{ stream.location || $t('common.notSet') }}</div>
       <Tag :type="stream.status === 'online' ? 'success' : 'default'" size="medium">
-        {{ stream.status === 'online' ? '在线' : '离线' }}
+        {{ stream.status === 'online' ? $t('streamList.online') : $t('streamList.offline') }}
       </Tag>
     </div>
   </div>

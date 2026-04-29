@@ -6,12 +6,12 @@
       <!-- Success State - Show Secret (Create Only) -->
       <div v-if="createdSecret" class="success-section">
         <van-notice-bar type="success" :scrollable="false">
-          <template #default> 设备创建成功！请立即保存密钥 </template>
+          <template #default> {{ $t('deviceForm.createSuccess') }} </template>
         </van-notice-bar>
 
         <SecretDisplay :secret="createdSecret" />
 
-        <van-button type="success" block round @click="handleDone">完成</van-button>
+        <van-button type="success" block round @click="handleDone">{{ $t('common.done') }}</van-button>
       </div>
 
       <!-- Form -->
@@ -21,12 +21,12 @@
           <van-field
             v-model="form.name"
             name="name"
-            label="设备名称"
-            placeholder="例如：客厅摄像头"
+            :label="$t('deviceForm.deviceName')"
+            :placeholder="$t('deviceForm.deviceNamePlaceholder')"
             clearable
             :rules="[
-              { required: true, message: '请输入设备名称' },
-              { pattern: /^.{1,100}$/, message: '设备名称不能超过100个字符' },
+              { required: true, message: $t('deviceForm.deviceNameRequired') },
+              { pattern: /^.{1,100}$/, message: $t('deviceForm.deviceNameMaxLength') },
             ]"
           />
         </van-cell-group>
@@ -36,16 +36,16 @@
           <van-field
             v-model="form.location"
             name="location"
-            label="位置"
-            placeholder="例如：客厅、卧室（可选）"
+            :label="$t('deviceForm.location')"
+            :placeholder="$t('deviceForm.locationPlaceholder')"
             clearable
-            :rules="[{ pattern: /^.{0,200}$/, message: '位置不能超过200个字符' }]"
+            :rules="[{ pattern: /^.{0,200}$/, message: $t('deviceForm.locationMaxLength') }]"
           />
         </van-cell-group>
 
         <!-- Enable/Disable Toggle (Edit Only) -->
         <van-cell-group v-if="isEditMode" inset>
-          <van-cell title="设备状态">
+          <van-cell :title="$t('deviceForm.deviceStatus')">
             <template #right-icon>
               <van-switch v-model="form.enabled" size="24" />
             </template>
@@ -55,14 +55,14 @@
         <!-- Info Notice -->
         <div class="info-notice">
           <van-notice-bar v-if="!isEditMode" left-icon="info-o" color="#1989fa" background="#ecf9ff" :scrollable="false">
-            <template #default> 创建后将生成密钥，请妥善保存，之后无法再次查看 </template>
+            <template #default> {{ $t('deviceForm.createNotice') }} </template>
           </van-notice-bar>
         </div>
 
         <!-- Submit Button -->
         <div class="form-actions">
           <van-button round block type="primary" native-type="submit" :loading="loading">
-            {{ isEditMode ? '保存' : '创建' }}
+            {{ isEditMode ? $t('common.save') : $t('deviceForm.createTitle') }}
           </van-button>
         </div>
       </van-form>
@@ -76,7 +76,9 @@ import { useRouter, useRoute } from 'vue-router'
 import { useDeviceStore } from '@/stores/device'
 import { showSuccessToast, showFailToast } from 'vant'
 import SecretDisplay from '@/components/SecretDisplay.vue'
+import { useI18n } from 'vue-i18n'
 
+const { t } = useI18n()
 const router = useRouter()
 const route = useRoute()
 const deviceStore = useDeviceStore()
@@ -92,7 +94,7 @@ const form = ref({
 
 // Mode detection
 const isEditMode = computed(() => !!route.params.id)
-const pageTitle = computed(() => (isEditMode.value ? '编辑设备' : '创建设备'))
+const pageTitle = computed(() => (isEditMode.value ? t('deviceForm.editTitle') : t('deviceForm.createTitle')))
 
 // Form submission
 async function handleSubmit() {
@@ -106,7 +108,7 @@ async function handleSubmit() {
         location: form.value.location || undefined,
         disabled: !form.value.enabled,
       })
-      showSuccessToast('设备更新成功')
+      showSuccessToast(t('deviceForm.updateSuccess'))
       router.back()
     } else {
       // Create new device
@@ -119,7 +121,7 @@ async function handleSubmit() {
     }
   } catch (error: any) {
     console.error('Submit failed:', error)
-    showFailToast(error.message || (isEditMode.value ? '更新失败' : '创建失败'))
+    showFailToast(error.message || (isEditMode.value ? t('deviceForm.updateFailed') : t('deviceForm.createFailed')))
   } finally {
     loading.value = false
   }
@@ -141,7 +143,7 @@ onMounted(async () => {
       form.value.enabled = !device.disabled
     } catch (error: any) {
       console.error('Load device failed:', error)
-      showFailToast(error.message || '加载设备信息失败')
+      showFailToast(error.message || t('deviceForm.loadFailed'))
       router.back()
     }
   }

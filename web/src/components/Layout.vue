@@ -54,9 +54,9 @@ function setActiveTab(name: string) {
 
     <!-- Bottom Navigation -->
     <Tabbar v-if="showBottomNav" v-model="activeTab" @change="setActiveTab" fixed placeholder>
-      <TabbarItem name="streams" icon="video">直播</TabbarItem>
-      <TabbarItem name="devices" icon="apps-o">设备</TabbarItem>
-      <TabbarItem name="profile" icon="user-o">我的</TabbarItem>
+      <TabbarItem name="streams" icon="video">{{ $t('nav.streams') }}</TabbarItem>
+      <TabbarItem name="devices" icon="apps-o">{{ $t('nav.devices') }}</TabbarItem>
+      <TabbarItem name="profile" icon="user-o">{{ $t('nav.profile') }}</TabbarItem>
     </Tabbar>
   </div>
 </template>
@@ -77,10 +77,10 @@ function setActiveTab(name: string) {
   flex: 1;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  background-color: var(--bg-primary); /* 添加背景色，这样页面不需要设置 min-height */
+  background-color: var(--bg-primary);
 }
 
 .content.with-bottom-nav {
-  padding-bottom: 70px; /* 增加到70px，确保底部导航不遮挡内容 */
+  padding-bottom: 70px;
 }
 </style>

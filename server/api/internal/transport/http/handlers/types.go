@@ -54,13 +54,15 @@ type UpdateDeviceRequest struct {
 }
 
 type DeviceInfo struct {
-	ID          string    `json:"id"`
-	Name        string    `json:"name"`
-	Location    string    `json:"location"`
-	PublishPath string    `json:"publish_path"`
-	Disabled    bool      `json:"disabled"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID          string     `json:"id"`
+	Name        string     `json:"name"`
+	Location    string     `json:"location"`
+	PublishPath string     `json:"publish_path"`
+	Disabled    bool       `json:"disabled"`
+	IsOnline    bool       `json:"is_online"`
+	LastSeenAt  *time.Time `json:"last_seen_at,omitempty"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
 }
 
 type RotateSecretResponse struct {

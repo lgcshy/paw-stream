@@ -14,9 +14,9 @@ const goToStreams = () => {
   <Layout>
     <div class="home-view">
       <div class="content">
-        <h2>欢迎使用 PawStream</h2>
-        <p>您的宠物实时监控系统</p>
-        <Button type="primary" size="large" round @click="goToStreams"> 查看视频流 </Button>
+        <h2>{{ $t('home.welcome') }}</h2>
+        <p>{{ $t('home.subtitle') }}</p>
+        <Button type="primary" size="large" round @click="goToStreams"> {{ $t('home.viewStreams') }} </Button>
       </div>
     </div>
   </Layout>

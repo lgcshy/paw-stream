@@ -228,3 +228,13 @@ func (s *Service) Delete(ctx context.Context, deviceID string) error {
 
 	return nil
 }
+
+// SetOnlineStatus updates a device's online/offline status by publish path
+func (s *Service) SetOnlineStatus(ctx context.Context, publishPath string, online bool) error {
+	return s.repo.SetOnlineStatus(ctx, publishPath, online)
+}
+
+// ListSharedWith retrieves all devices shared with a user
+func (s *Service) ListSharedWith(ctx context.Context, userID string) ([]*Device, error) {
+	return s.repo.ListSharedWith(ctx, userID)
+}

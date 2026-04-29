@@ -4,7 +4,7 @@
       <!-- User Info Header -->
       <div class="user-header">
         <div class="avatar-wrapper" @click="triggerAvatarUpload">
-          <img v-if="avatarURL" :src="avatarURL" class="avatar-img" alt="头像" />
+          <img v-if="avatarURL" :src="avatarURL" class="avatar-img" :alt="$t('profile.defaultNickname')" />
           <van-icon v-else name="user-circle-o" size="60" color="#1989fa" />
           <div class="avatar-edit-hint">
             <van-icon name="photograph" size="14" color="#fff" />
@@ -18,41 +18,46 @@
           @change="onFileSelected"
         />
         <div class="user-info">
-          <h2>{{ user?.nickname || user?.username || '用户' }}</h2>
+          <h2>{{ user?.nickname || user?.username || $t('profile.defaultNickname') }}</h2>
           <p class="username">@{{ user?.username }}</p>
         </div>
       </div>
 
       <!-- Statistics -->
-      <van-cell-group inset title="统计信息">
-        <van-cell title="设备总数" :value="deviceCount" />
-        <van-cell title="在线设备" :value="enabledDeviceCount" />
-        <van-cell title="注册时间" :value="formatDate(user?.created_at || '')" />
+      <van-cell-group inset :title="$t('profile.statistics')">
+        <van-cell :title="$t('profile.totalDevices')" :value="deviceCount" />
+        <van-cell :title="$t('profile.onlineDevices')" :value="enabledDeviceCount" />
+        <van-cell :title="$t('profile.registeredAt')" :value="formatDate(user?.created_at || '')" />
       </van-cell-group>
 
       <!-- Account Info -->
-      <van-cell-group inset title="账号信息">
-        <van-cell title="用户ID" :value="user?.id" />
-        <van-cell title="账号状态" :value="user?.disabled ? '已禁用' : '正常'" />
+      <van-cell-group inset :title="$t('profile.accountInfo')">
+        <van-cell :title="$t('profile.userId')" :value="user?.id" />
+        <van-cell :title="$t('profile.accountStatus')" :value="user?.disabled ? $t('profile.statusDisabled') : $t('profile.statusNormal')" />
       </van-cell-group>
 
       <!-- Settings -->
-      <van-cell-group inset title="设置">
-        <van-cell title="主题设置" is-link :value="themeLabel" @click="showThemePicker = true">
+      <van-cell-group inset :title="$t('profile.settings')">
+        <van-cell :title="$t('profile.themeSetting')" is-link :value="themeLabel" @click="showThemePicker = true">
           <template #icon>
             <van-icon :name="themeIcon" color="#1989fa" />
+          </template>
+        </van-cell>
+        <van-cell :title="$t('profile.languageSetting')" is-link :value="languageLabel" @click="showLanguagePicker = true">
+          <template #icon>
+            <van-icon name="globe-o" color="#1989fa" />
           </template>
         </van-cell>
       </van-cell-group>
 
       <!-- Actions -->
-      <van-cell-group inset title="操作">
-        <van-cell title="关于 PawStream" is-link @click="handleAbout">
+      <van-cell-group inset :title="$t('profile.actions')">
+        <van-cell :title="$t('profile.about')" is-link @click="handleAbout">
           <template #icon>
             <van-icon name="info-o" color="#1989fa" />
           </template>
         </van-cell>
-        <van-cell title="退出登录" is-link @click="handleLogout">
+        <van-cell :title="$t('profile.logout')" is-link @click="handleLogout">
           <template #icon>
             <van-icon name="warning-o" color="#ee0a24" />
           </template>
@@ -62,24 +67,24 @@
       <!-- Logout Confirm Dialog -->
       <ConfirmDialog
         v-model:show="showLogoutConfirm"
-        title="退出登录"
-        message="确定要退出登录吗？"
-        confirm-text="退出"
-        cancel-text="取消"
+        :title="$t('profile.logoutConfirmTitle')"
+        :message="$t('profile.logoutConfirmMessage')"
+        :confirm-text="$t('profile.logoutButton')"
+        :cancel-text="$t('common.cancel')"
         @confirm="confirmLogout"
       />
 
       <!-- About Dialog -->
-      <van-dialog v-model:show="showAboutDialog" title="关于 PawStream" :show-cancel-button="false">
+      <van-dialog v-model:show="showAboutDialog" :title="$t('profile.aboutTitle')" :show-cancel-button="false">
         <div class="about-content">
           <div class="about-logo">🐾</div>
           <h3>PawStream</h3>
           <p class="version">Version 1.0.0</p>
-          <p class="description">基于 WebRTC 的宠物实时监控系统</p>
+          <p class="description">{{ $t('profile.aboutDescription') }}</p>
           <div class="tech-stack">
-            <p><strong>前端技术:</strong></p>
+            <p><strong>{{ $t('profile.aboutFrontend') }}</strong></p>
             <p>Vue 3 + Vite + Vant + TypeScript</p>
-            <p><strong>后端技术:</strong></p>
+            <p><strong>{{ $t('profile.aboutBackend') }}</strong></p>
             <p>Go + Fiber + SQLite + MediaMTX</p>
           </div>
         </div>
@@ -89,9 +94,18 @@
       <van-action-sheet
         v-model:show="showThemePicker"
         :actions="themeActions"
-        cancel-text="取消"
+        :cancel-text="$t('common.cancel')"
         close-on-click-action
         @select="onThemeSelect"
+      />
+
+      <!-- Language Picker -->
+      <van-action-sheet
+        v-model:show="showLanguagePicker"
+        :actions="languageActions"
+        :cancel-text="$t('common.cancel')"
+        close-on-click-action
+        @select="onLanguageSelect"
       />
     </div>
   </Layout>
@@ -107,7 +121,10 @@ import { showSuccessToast, showFailToast, showLoadingToast, closeToast } from 'v
 import type { ActionSheetAction } from 'vant'
 import Layout from '@/components/Layout.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import { useI18n } from 'vue-i18n'
+import { setLocale, getLocale } from '@/locales'
 
+const { t } = useI18n()
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'
 
 const router = useRouter()
@@ -118,6 +135,7 @@ const themeStore = useThemeStore()
 const showLogoutConfirm = ref(false)
 const showAboutDialog = ref(false)
 const showThemePicker = ref(false)
+const showLanguagePicker = ref(false)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 
 const avatarURL = computed(() => {
@@ -133,13 +151,13 @@ const enabledDeviceCount = computed(() => deviceStore.enabledDevices?.length ?? 
 const themeLabel = computed(() => {
   switch (themeStore.mode) {
     case 'light':
-      return '浅色模式'
+      return t('profile.themeLight')
     case 'dark':
-      return '深色模式'
+      return t('profile.themeDark')
     case 'auto':
-      return '跟随系统'
+      return t('profile.themeAuto')
     default:
-      return '跟随系统'
+      return t('profile.themeAuto')
   }
 })
 
@@ -152,36 +170,53 @@ const themeIcon = computed(() => {
 
 const themeActions = computed<ActionSheetAction[]>(() => [
   {
-    name: '跟随系统',
-    subname: themeStore.mode === 'auto' ? '当前' : '',
+    name: t('profile.themeAuto'),
+    subname: themeStore.mode === 'auto' ? t('profile.themeCurrent') : '',
   },
   {
-    name: '浅色模式',
-    subname: themeStore.mode === 'light' ? '当前' : '',
+    name: t('profile.themeLight'),
+    subname: themeStore.mode === 'light' ? t('profile.themeCurrent') : '',
   },
   {
-    name: '深色模式',
-    subname: themeStore.mode === 'dark' ? '当前' : '',
+    name: t('profile.themeDark'),
+    subname: themeStore.mode === 'dark' ? t('profile.themeCurrent') : '',
   },
 ])
 
 function onThemeSelect(action: ActionSheetAction) {
   let mode: 'light' | 'dark' | 'auto' = 'auto'
-  
-  switch (action.name) {
-    case '跟随系统':
-      mode = 'auto'
-      break
-    case '浅色模式':
-      mode = 'light'
-      break
-    case '深色模式':
-      mode = 'dark'
-      break
+
+  if (action.name === t('profile.themeAuto')) {
+    mode = 'auto'
+  } else if (action.name === t('profile.themeLight')) {
+    mode = 'light'
+  } else if (action.name === t('profile.themeDark')) {
+    mode = 'dark'
   }
-  
+
   themeStore.setMode(mode)
-  showSuccessToast(`已切换到${action.name}`)
+  showSuccessToast(t('profile.themeSwitched', { name: action.name }))
+}
+
+// Language related
+const languageLabel = computed(() => {
+  return getLocale() === 'zh-CN' ? '中文' : 'English'
+})
+
+const languageActions = computed<ActionSheetAction[]>(() => [
+  {
+    name: '中文',
+    subname: getLocale() === 'zh-CN' ? t('profile.themeCurrent') : '',
+  },
+  {
+    name: 'English',
+    subname: getLocale() === 'en' ? t('profile.themeCurrent') : '',
+  },
+])
+
+function onLanguageSelect(action: ActionSheetAction) {
+  const locale = action.name === '中文' ? 'zh-CN' : 'en'
+  setLocale(locale)
 }
 
 function triggerAvatarUpload() {
@@ -197,25 +232,26 @@ async function onFileSelected(event: Event) {
   input.value = ''
 
   if (file.size > 2 * 1024 * 1024) {
-    showFailToast('图片大小不能超过 2MB')
+    showFailToast(t('profile.avatarSizeLimit'))
     return
   }
 
-  showLoadingToast({ message: '上传中...', forbidClick: true })
+  showLoadingToast({ message: t('profile.avatarUpload'), forbidClick: true })
   try {
     await authStore.updateAvatar(file)
     closeToast()
-    showSuccessToast('头像更新成功')
+    showSuccessToast(t('profile.avatarSuccess'))
   } catch (error) {
     closeToast()
-    showFailToast('上传失败')
+    showFailToast(t('profile.avatarFailed'))
   }
 }
 
 function formatDate(dateStr: string) {
   if (!dateStr) return '-'
   const date = new Date(dateStr)
-  return date.toLocaleDateString('zh-CN', {
+  const locale = getLocale() === 'zh-CN' ? 'zh-CN' : 'en-US'
+  return date.toLocaleDateString(locale, {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
@@ -228,7 +264,7 @@ function handleLogout() {
 
 async function confirmLogout() {
   await authStore.logout()
-  showSuccessToast('已退出登录')
+  showSuccessToast(t('profile.logoutSuccess'))
   router.push('/login')
 }
 
@@ -252,7 +288,6 @@ onMounted(async () => {
 <style scoped>
 .profile-page {
   width: 100%;
-  /* 移除 min-height: 100%，让内容自然增长，保持与其他页面一致 */
 }
 
 .user-header {
@@ -274,7 +309,7 @@ onMounted(async () => {
   left: 0;
   width: 100%;
   height: 100%;
-  background: 
+  background:
     radial-gradient(circle at 10% 20%, rgba(56, 239, 125, 0.1) 0%, transparent 50%),
     radial-gradient(circle at 90% 80%, rgba(17, 153, 142, 0.1) 0%, transparent 50%);
   animation: headerFloat 15s ease-in-out infinite;

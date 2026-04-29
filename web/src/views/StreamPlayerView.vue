@@ -8,7 +8,9 @@ import { useDeviceStore } from '@/stores/device'
 import { useConfigStore } from '@/stores/config'
 import { WebRTCPlayer } from '@/utils/webrtc'
 import type { StreamPlayerProps } from '@/types/stream'
+import { useI18n } from 'vue-i18n'
 
+const { t } = useI18n()
 const props = defineProps<StreamPlayerProps>()
 const route = useRoute()
 const router = useRouter()
@@ -25,9 +27,9 @@ const player = ref<WebRTCPlayer | null>(null)
 
 onMounted(async () => {
   const streamPath = props.id || (route.params.id as string)
-  
+
   if (!streamPath) {
-    error.value = '无效的视频流路径'
+    error.value = t('player.invalidPath')
     loading.value = false
     return
   }
@@ -50,13 +52,13 @@ onUnmounted(() => {
 
 async function startStream(path: string) {
   if (!videoRef.value) {
-    error.value = '视频元素未初始化'
+    error.value = t('player.videoNotReady')
     loading.value = false
     return
   }
 
   if (!authStore.token) {
-    error.value = '未登录,无法播放视频'
+    error.value = t('player.notLoggedIn')
     loading.value = false
     return
   }
@@ -67,9 +69,9 @@ async function startStream(path: string) {
   try {
     // Fetch MediaMTX URL from config
     await configStore.fetchConfig()
-    
+
     if (!configStore.mediamtxWebRTCURL) {
-      throw new Error('无法获取 MediaMTX 配置')
+      throw new Error(t('player.configError'))
     }
 
     player.value = new WebRTCPlayer({
@@ -80,12 +82,12 @@ async function startStream(path: string) {
       onConnectionStateChange: (state) => {
         connectionState.value = state
         console.log('Connection state:', state)
-        
+
         if (state === 'connected') {
           loading.value = false
-          showSuccessToast('连接成功')
+          showSuccessToast(t('player.connected'))
         } else if (state === 'failed') {
-          error.value = '连接失败'
+          error.value = t('player.connectionFailed')
           loading.value = false
         }
       },
@@ -93,16 +95,16 @@ async function startStream(path: string) {
         console.error('WebRTC error:', err)
         error.value = err.message
         loading.value = false
-        showFailToast('播放失败: ' + err.message)
+        showFailToast(t('player.playFailed') + ': ' + err.message)
       },
     })
 
     await player.value.start()
   } catch (err) {
     console.error('Failed to start stream:', err)
-    error.value = err instanceof Error ? err.message : '无法启动视频流'
+    error.value = err instanceof Error ? err.message : t('player.cannotStart')
     loading.value = false
-    showFailToast('播放失败')
+    showFailToast(t('player.playFailed'))
   }
 }
 
@@ -136,9 +138,9 @@ function goBack() {
           muted
           :class="{ hidden: loading || error }"
         />
-        
+
         <div v-if="loading" class="overlay">
-          <Loading type="spinner" size="48px" color="#fff">连接中...</Loading>
+          <Loading type="spinner" size="48px" color="#fff">{{ $t('player.connecting') }}</Loading>
         </div>
 
         <div v-if="error && !loading" class="overlay error-overlay">
@@ -146,8 +148,8 @@ function goBack() {
             <p class="error-icon">⚠️</p>
             <p class="error-message">{{ error }}</p>
             <div class="error-actions">
-              <Button type="primary" size="small" @click="retry">重试</Button>
-              <Button size="small" @click="goBack">返回</Button>
+              <Button type="primary" size="small" @click="retry">{{ $t('common.retry') }}</Button>
+              <Button size="small" @click="goBack">{{ $t('common.back') }}</Button>
             </div>
           </div>
         </div>
@@ -158,12 +160,12 @@ function goBack() {
           <p class="stream-name">{{ streamName }}</p>
           <p class="stream-status">
             <span :class="['status-dot', connectionState === 'connected' ? 'online' : 'offline']"></span>
-            {{ connectionState === 'connected' ? '播放中' : connectionState }}
+            {{ connectionState === 'connected' ? $t('player.playing') : connectionState }}
           </p>
         </div>
         <div class="control-buttons">
-          <Button size="small" @click="retry" :disabled="loading">重新连接</Button>
-          <Button size="small" @click="goBack">返回列表</Button>
+          <Button size="small" @click="retry" :disabled="loading">{{ $t('player.reconnect') }}</Button>
+          <Button size="small" @click="goBack">{{ $t('player.backToList') }}</Button>
         </div>
       </div>
     </div>

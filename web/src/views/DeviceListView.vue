@@ -2,9 +2,9 @@
   <Layout>
     <div class="device-list-page">
       <div class="header">
-        <h2>设备管理</h2>
+        <h2>{{ $t('deviceList.title') }}</h2>
         <van-button icon="plus" type="primary" size="small" @click="handleAddDevice">
-          新增设备
+          {{ $t('deviceList.addDevice') }}
         </van-button>
       </div>
 
@@ -12,12 +12,12 @@
       <van-pull-refresh v-model="refreshing" @refresh="onRefresh">
       <!-- Loading State -->
       <div v-if="deviceStore.loading && !refreshing" class="loading-container">
-        <van-loading type="spinner" size="40px">加载中...</van-loading>
+        <van-loading type="spinner" size="40px">{{ $t('common.loading') }}</van-loading>
       </div>
 
       <!-- Empty State -->
-      <van-empty v-else-if="!deviceStore.loading && devices.length === 0" description="还没有设备">
-        <van-button type="primary" round @click="handleAddDevice">创建第一个设备</van-button>
+      <van-empty v-else-if="!deviceStore.loading && devices.length === 0" :description="$t('deviceList.noDevices')">
+        <van-button type="primary" round @click="handleAddDevice">{{ $t('deviceList.createFirst') }}</van-button>
       </van-empty>
 
       <!-- Device List -->
@@ -49,7 +49,9 @@ import { useDeviceStore } from '@/stores/device'
 import { showFailToast } from 'vant'
 import Layout from '@/components/Layout.vue'
 import type { DeviceInfo } from '@/types/api'
+import { useI18n } from 'vue-i18n'
 
+const { t } = useI18n()
 const router = useRouter()
 const deviceStore = useDeviceStore()
 const refreshing = ref(false)
@@ -62,12 +64,12 @@ function deviceLabel(device: DeviceInfo) {
   if (device.location) {
     parts.push(device.location)
   }
-  parts.push(`创建于 ${formatDate(device.created_at)}`)
+  parts.push(t('deviceList.createdAt', { date: formatDate(device.created_at) }))
   return parts.join(' · ')
 }
 
 function deviceStatus(device: DeviceInfo) {
-  return device.disabled ? '已禁用' : '已启用'
+  return device.disabled ? t('deviceList.disabled') : t('deviceList.enabled')
 }
 
 function deviceStatusClass(device: DeviceInfo) {
@@ -106,7 +108,7 @@ async function onRefresh() {
     await deviceStore.refreshDevices()
   } catch (error: any) {
     console.error('Refresh failed:', error)
-    showFailToast(error.message || '刷新失败')
+    showFailToast(error.message || t('deviceList.refreshFailed'))
   } finally {
     refreshing.value = false
   }
@@ -119,7 +121,7 @@ onMounted(async () => {
     await deviceStore.fetchDevices()
   } catch (error: any) {
     console.error('Fetch devices failed:', error)
-    showFailToast(error.message || '获取设备列表失败')
+    showFailToast(error.message || t('deviceList.fetchFailed'))
   }
 })
 </script>
@@ -127,7 +129,6 @@ onMounted(async () => {
 <style scoped>
 .device-list-page {
   width: 100%;
-  /* 移除 min-height: 100%，让内容自然增长，避免滚动问题 */
 }
 
 .header {

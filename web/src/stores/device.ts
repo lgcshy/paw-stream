@@ -15,13 +15,16 @@ export const useDeviceStore = defineStore('device', () => {
 
   // Getters
   const streams = computed<Stream[]>(() => {
-    return paths.value?.map((path) => ({
-      id: path.publish_path,
-      name: path.device_name,
-      deviceId: path.device_id,
-      location: path.device_location,
-      status: 'online' as const, // All enabled devices are considered online
-    })) ?? []
+    return paths.value?.map((path) => {
+      const dev = devices.value?.find((d) => d.id === path.device_id)
+      return {
+        id: path.publish_path,
+        name: path.device_name,
+        deviceId: path.device_id,
+        location: path.device_location,
+        status: (dev?.is_online ? 'online' : 'offline') as 'online' | 'offline',
+      }
+    }) ?? []
   })
 
   const enabledStreams = computed(() => {

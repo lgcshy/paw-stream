@@ -3,6 +3,8 @@ package stream
 import (
 	"context"
 	"fmt"
+	"math"
+	"math/rand/v2"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -224,13 +226,24 @@ func (m *Manager) handleError(err error) {
 	}
 
 	m.state = "reconnecting"
+
+	// Exponential backoff: base * 2^(attempt-1), capped at 5 minutes, with jitter
+	backoff := float64(m.config.ReconnectInterval) * math.Pow(2, float64(currentCount-1))
+	maxBackoff := float64(5 * time.Minute)
+	if backoff > maxBackoff {
+		backoff = maxBackoff
+	}
+	// Add random jitter: 0.5x to 1.0x of the computed backoff
+	jitter := 0.5 + rand.Float64()*0.5
+	delay := time.Duration(backoff * jitter)
+
 	m.logger.Info().
 		Int32("attempt", currentCount).
-		Dur("interval", m.config.ReconnectInterval).
+		Dur("delay", delay).
 		Msg("Reconnecting...")
 
 	// Wait before reconnecting
-	time.Sleep(m.config.ReconnectInterval)
+	time.Sleep(delay)
 
 	// Attempt to restart with same engine type
 	engineConfig := EngineConfig{

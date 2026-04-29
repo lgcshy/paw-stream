@@ -77,6 +77,15 @@ func (s *Service) Login(ctx context.Context, username, pwd string) (*User, error
 	return user, nil
 }
 
+// GetByUsername retrieves a user by username
+func (s *Service) GetByUsername(ctx context.Context, username string) (*User, error) {
+	user, err := s.repo.GetByUsername(ctx, username)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get user")
+	}
+	return user, nil
+}
+
 // GetByID retrieves a user by ID
 func (s *Service) GetByID(ctx context.Context, id string) (*User, error) {
 	user, err := s.repo.GetByID(ctx, id)

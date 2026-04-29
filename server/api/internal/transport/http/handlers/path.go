@@ -30,7 +30,7 @@ func (h *PathHandler) List(c *fiber.Ctx) error {
 		})
 	}
 
-	// Get user's devices
+	// Get user's own devices
 	devices, err := h.deviceService.ListByOwner(c.Context(), userID)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{
@@ -50,6 +50,21 @@ func (h *PathHandler) List(c *fiber.Ctx) error {
 				DeviceName:     d.Name,
 				DeviceLocation: d.Location,
 			})
+		}
+	}
+
+	// Also include shared devices
+	sharedDevices, err := h.deviceService.ListSharedWith(c.Context(), userID)
+	if err == nil {
+		for _, d := range sharedDevices {
+			if !d.Disabled {
+				paths = append(paths, &PathInfo{
+					PublishPath:    d.PublishPath,
+					DeviceID:       d.ID,
+					DeviceName:     d.Name,
+					DeviceLocation: d.Location,
+				})
+			}
 		}
 	}
 

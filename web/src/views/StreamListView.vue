@@ -5,10 +5,12 @@ import { List, Cell, Tag, Empty, Loading, PullRefresh, Icon, showFailToast, show
 import Layout from '@/components/Layout.vue'
 import StreamPreviewCard from '@/components/StreamPreviewCard.vue'
 import { useDeviceStore } from '@/stores/device'
+import { useI18n } from 'vue-i18n'
 
 const VIEW_MODE_KEY = 'pawstream_view_mode'
 type ViewMode = 'list' | 'grid'
 
+const { t } = useI18n()
 const router = useRouter()
 const deviceStore = useDeviceStore()
 
@@ -29,16 +31,16 @@ async function loadStreams() {
   try {
     await deviceStore.fetchPaths()
   } catch (error) {
-    showFailToast('加载设备列表失败')
+    showFailToast(t('streamList.loadFailed'))
   }
 }
 
 async function onRefresh() {
   try {
     await deviceStore.refreshPaths()
-    showSuccessToast('刷新成功')
+    showSuccessToast(t('streamList.refreshSuccess'))
   } catch (error) {
-    showFailToast('刷新失败')
+    showFailToast(t('streamList.refreshFailed'))
   }
 }
 
@@ -52,7 +54,7 @@ const goToPlayer = (streamId: string) => {
     <div class="stream-list-view">
       <div class="header">
         <div class="header-row">
-          <h2>直播流</h2>
+          <h2>{{ $t('streamList.title') }}</h2>
           <Icon
             :name="viewMode === 'list' ? 'photo' : 'bars'"
             size="22"
@@ -60,38 +62,36 @@ const goToPlayer = (streamId: string) => {
             @click="toggleViewMode"
           />
         </div>
-        <p class="subtitle">选择一个设备观看实时画面</p>
+        <p class="subtitle">{{ $t('streamList.subtitle') }}</p>
       </div>
 
       <PullRefresh v-model="loading" @refresh="onRefresh">
         <div v-if="loading && streams.length === 0" class="loading-container">
-          <Loading type="spinner" size="48px">加载中...</Loading>
+          <Loading type="spinner" size="48px">{{ $t('common.loading') }}</Loading>
         </div>
-        <Empty v-else-if="streams.length === 0" description="暂无在线设备">
+        <Empty v-else-if="streams.length === 0" :description="$t('streamList.noDevices')">
           <template #description>
-            <p>暂无在线设备</p>
-            <p style="font-size: 12px; color: #969799; margin-top: 8px">请先在"设备管理"中创建并启用设备</p>
+            <p>{{ $t('streamList.noDevices') }}</p>
+            <p style="font-size: 12px; color: #969799; margin-top: 8px">{{ $t('streamList.noDevicesHint') }}</p>
           </template>
         </Empty>
-        <!-- 列表模式 -->
         <List v-else-if="viewMode === 'list'">
           <Cell
             v-for="stream in streams"
             :key="stream.id"
             :title="stream.name"
-            :label="`位置: ${stream.location || '未设置'} | 路径: ${stream.id}`"
+            :label="`${$t('streamList.location')}: ${stream.location || $t('common.notSet')} | ${$t('streamList.path')}: ${stream.id}`"
             is-link
             @click="goToPlayer(stream.id)"
           >
             <template #right-icon>
               <Tag :type="stream.status === 'online' ? 'success' : 'default'">
-                {{ stream.status === 'online' ? '在线' : '离线' }}
+                {{ stream.status === 'online' ? $t('streamList.online') : $t('streamList.offline') }}
               </Tag>
             </template>
           </Cell>
         </List>
 
-        <!-- 图片/卡片模式（实时预览） -->
         <div v-else class="grid-view">
           <StreamPreviewCard
             v-for="stream in streams"
@@ -108,7 +108,6 @@ const goToPlayer = (streamId: string) => {
 <style scoped>
 .stream-list-view {
   width: 100%;
-  /* 移除 min-height: 100%，让内容自然增长，避免滚动问题 */
 }
 
 .header {
@@ -149,7 +148,6 @@ const goToPlayer = (streamId: string) => {
   padding: 40px 0;
 }
 
-/* 图片/卡片模式 */
 .grid-view {
   display: grid;
   grid-template-columns: 1fr 1fr;

@@ -7,19 +7,22 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/lgc/pawstream/api/internal/domain/acl"
+	"github.com/lgc/pawstream/api/internal/domain/device"
 )
 
 // MediaMTXHandler handles MediaMTX authentication callbacks
 type MediaMTXHandler struct {
-	aclService *acl.Service
-	log        zerolog.Logger
+	aclService    *acl.Service
+	deviceService *device.Service
+	log           zerolog.Logger
 }
 
 // NewMediaMTXHandler creates a new MediaMTX handler
-func NewMediaMTXHandler(aclService *acl.Service, log zerolog.Logger) *MediaMTXHandler {
+func NewMediaMTXHandler(aclService *acl.Service, deviceService *device.Service, log zerolog.Logger) *MediaMTXHandler {
 	return &MediaMTXHandler{
-		aclService: aclService,
-		log:        log,
+		aclService:    aclService,
+		deviceService: deviceService,
+		log:           log,
 	}
 }
 
@@ -99,6 +102,12 @@ func (h *MediaMTXHandler) Auth(c *fiber.Ctx) error {
 
 	// Return result
 	if result.Allowed {
+		// Update device online status on publish
+		if req.Action == "publish" {
+			if err := h.deviceService.SetOnlineStatus(c.Context(), req.Path, true); err != nil {
+				h.log.Error().Err(err).Str("path", req.Path).Msg("failed to set device online")
+			}
+		}
 		return c.SendStatus(fiber.StatusOK)
 	}
 
@@ -106,4 +115,26 @@ func (h *MediaMTXHandler) Auth(c *fiber.Ctx) error {
 		"error":   "forbidden",
 		"message": result.Reason,
 	})
+}
+
+// StreamClosed handles POST /internal/stream-closed (called when a stream ends)
+func (h *MediaMTXHandler) StreamClosed(c *fiber.Ctx) error {
+	var req struct {
+		Path string `json:"path"`
+	}
+	if err := c.BodyParser(&req); err != nil || req.Path == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "bad_request",
+		})
+	}
+
+	if err := h.deviceService.SetOnlineStatus(c.Context(), req.Path, false); err != nil {
+		h.log.Error().Err(err).Str("path", req.Path).Msg("failed to set device offline")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "internal_error",
+		})
+	}
+
+	h.log.Info().Str("path", req.Path).Msg("device stream closed, set offline")
+	return c.SendStatus(fiber.StatusOK)
 }

@@ -12,6 +12,9 @@ func (a *App) setupRoutes() {
 	// MediaMTX auth callback (no auth required)
 	a.fiber.Post("/mediamtx/auth", a.mediamtxHandler.Auth)
 
+	// Internal endpoints (called by MediaMTX hooks)
+	a.fiber.Post("/internal/stream-closed", a.mediamtxHandler.StreamClosed)
+
 	// API routes
 	api := a.fiber.Group("/api")
 
@@ -44,6 +47,11 @@ func (a *App) setupRoutes() {
 	protected.Put("/devices/:id", a.deviceHandler.Update)
 	protected.Delete("/devices/:id", a.deviceHandler.Delete)
 	protected.Post("/devices/:id/rotate-secret", a.deviceHandler.RotateSecret)
+
+	// Device sharing
+	protected.Post("/devices/:id/share", a.deviceHandler.ShareDevice)
+	protected.Delete("/devices/:id/share/:userId", a.deviceHandler.UnshareDevice)
+	protected.Get("/devices/:id/shares", a.deviceHandler.ListShares)
 
 	// Path query
 	protected.Get("/paths", a.pathHandler.List)
